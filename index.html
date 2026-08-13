@@ -709,7 +709,7 @@ async function processarUploadPlanilha(event){
 
 // ---------- Integração direta com o Google Sheets (sem servidor, OAuth no navegador) ----------
 // Substitua pelo Client ID gerado no Google Cloud Console (veja instruções no README).
-const GOOGLE_CLIENT_ID = 'COLOQUE_SEU_CLIENT_ID_AQUI.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '905544159367-abd4eik2c512554qcmplrnppnq9ojc2g.apps.googleusercontent.com';
 
 let googleAccessToken = null;
 let googleTokenClient = null;
@@ -734,7 +734,7 @@ function initGoogleClient(){
 }
 
 function conectarGoogleSheets(){
-  if(GOOGLE_CLIENT_ID.includes('COLOQUE_SEU_CLIENT_ID_AQUI')){
+  if(GOOGLE_CLIENT_ID.includes('905544159367-abd4eik2c512554qcmplrnppnq9ojc2g.apps.googleusercontent.com')){
     alert('Ainda falta configurar o Client ID do Google neste site. Veja o passo a passo que te mandei para criar o seu.');
     return;
   }

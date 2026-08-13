@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Meu Assistente Financeiro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --wa-header:#075E54;
+    --wa-header-dark:#054C40;
+    --wa-bg:#E7DFD5;
+    --wa-bubble-in:#FFFFFF;
+    --wa-bubble-out:#DCF8C6;
+    --wa-text:#1F2C34;
+    --wa-text-soft:#667781;
+    --wa-accent:#25D366;
+    --wa-danger:#D9534F;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0; height:100%;}
+  body{
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    background:#0B141A;
+    display:flex;
+    justify-content:center;
+  }
+  .app{
+    width:100%;
+    max-width:480px;
+    height:100vh;
+    background:var(--wa-bg);
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+  .header{
+    background:var(--wa-header);
+    color:#fff;
+    padding:14px 16px;
+    padding-top:calc(14px + env(safe-area-inset-top));
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-shrink:0;
+  }
+  .avatar{
+    width:38px;height:38px;border-radius:50%;
+    background:linear-gradient(135deg,#25D366,#128C7E);
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;
+    flex-shrink:0;
+  }
+  .header-info{flex:1; min-width:0;}
+  .header-info .name{font-size:15.5px;font-weight:600;}
+  .header-info .status{font-size:11.5px;color:#CFE9E2;}
+  .header-icons{display:flex;gap:14px;font-size:17px;opacity:.9;cursor:pointer;}
+
+  .summary{
+    display:flex;
+    gap:8px;
+    padding:10px 10px 0;
+    flex-shrink:0;
+  }
+  .summary-card{
+    flex:1;
+    background:#fff;
+    border-radius:10px;
+    padding:8px 10px;
+    text-align:center;
+  }
+  .summary-card .label{font-size:10.5px; color:var(--wa-text-soft);}
+  .summary-card .value{font-size:14px; font-weight:700; color:var(--wa-header-dark); margin-top:2px;}
+
+  .chat{
+    flex:1;
+    overflow-y:auto;
+    padding:10px 10px;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .bubble-row{display:flex; margin:3px 0;}
+  .bubble-row.out{justify-content:flex-end;}
+  .bubble{
+    max-width:82%;
+    padding:7px 10px 8px 10px;
+    border-radius:8px;
+    font-size:14px;
+    line-height:1.38;
+    white-space:pre-wrap;
+    box-shadow:0 1px 0.5px rgba(0,0,0,.13);
+  }
+  .bubble.in{background:var(--wa-bubble-in); color:var(--wa-text); border-top-left-radius:2px;}
+  .bubble.out{background:var(--wa-bubble-out); color:var(--wa-text); border-top-right-radius:2px;}
+  .bubble .time{display:block; text-align:right; font-size:10.5px; color:var(--wa-text-soft); margin-top:3px;}
+  .bubble b{font-weight:700;}
+
+  .quickbar{
+    display:flex;
+    gap:6px;
+    padding:8px 10px 4px;
+    overflow-x:auto;
+    background:var(--wa-bg);
+    flex-shrink:0;
+  }
+  .chip{
+    background:#fff;
+    border:1px solid #d6cfc3;
+    border-radius:16px;
+    padding:6px 12px;
+    font-size:12.5px;
+    color:var(--wa-header-dark);
+    white-space:nowrap;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+
+  .inputbar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 10px;
+    padding-bottom:calc(8px + env(safe-area-inset-bottom));
+    background:#F0EBE3;
+    flex-shrink:0;
+  }
+  .inputbar input{
+    flex:1;
+    border:none;
+    border-radius:20px;
+    padding:11px 14px;
+    font-size:14px;
+    outline:none;
+  }
+  .sendbtn{
+    width:40px;height:40px;
+    border-radius:50%;
+    background:var(--wa-header);
+    color:#fff;
+    border:none;
+    font-size:16px;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+
+  .modal-overlay{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.45);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:20;
+    padding:16px;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal{
+    background:#fff;
+    width:100%;
+    max-width:400px;
+    max-height:82vh;
+    overflow-y:auto;
+    border-radius:12px;
+    padding:16px;
+  }
+  .modal h3{margin:0 0 10px; color:var(--wa-header-dark); font-size:16px;}
+  .modal p.hint{font-size:12px; color:var(--wa-text-soft); margin-top:-4px;}
+  .modal label{display:block; font-size:12px; color:var(--wa-text-soft); margin-top:10px;}
+  .modal input, .modal select{
+    width:100%; padding:9px; margin-top:4px; border:1px solid #ddd; border-radius:6px; font-size:14px;
+  }
+  .modal-actions{display:flex; gap:8px; margin-top:16px;}
+  .modal-actions button{
+    flex:1; padding:11px; border:none; border-radius:8px; font-size:13px; cursor:pointer;
+  }
+  .btn-primary{background:var(--wa-header); color:#fff;}
+  .btn-secondary{background:#eee; color:#333;}
+  .share-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 0; border-bottom:1px solid #eee; font-size:13px;
+  }
+  .share-item .perm{font-size:11px; color:var(--wa-text-soft);}
+  .share-remove{color:var(--wa-danger); cursor:pointer; font-size:12px;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <div class="avatar">💰</div>
+    <div class="header-info">
+      <div class="name">Meu Assistente Financeiro</div>
+      <div class="status" id="statusLine">configure sua renda para começar</div>
+    </div>
+    <div class="header-icons">
+      <span title="Contas a pagar" onclick="abrirModal('contas')">📋</span>
+      <span title="Google Sheets" onclick="abrirModal('google')">🔗</span>
+      <span title="Compartilhar" onclick="abrirModal('compartilhar')">👥</span>
+      <span title="Configurações" onclick="abrirModal('config')">⚙️</span>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="summary-card">
+      <div class="label">Saldo</div>
+      <div class="value" id="cardSaldo">—</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Gasto hoje</div>
+      <div class="value" id="cardHoje">—</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Próx. conta</div>
+      <div class="value" id="cardConta">—</div>
+    </div>
+  </div>
+
+  <div class="chat" id="chat"></div>
+
+  <div class="quickbar">
+    <div class="chip" onclick="enviarRapido('saldo')">💰 Saldo</div>
+    <div class="chip" onclick="enviarRapido('relatório')">📊 Relatório</div>
+    <div class="chip" onclick="abrirModal('contas')">📋 Contas</div>
+    <div class="chip" onclick="abrirModal('compartilhar')">👥 Compartilhar</div>
+    <div class="chip" id="chipExportar" onclick="document.getElementById('fileInputPlanilha').click()">📊 Exportar p/ planilha</div>
+    <div class="chip" onclick="enviarRapido('ajuda')">❓ Ajuda</div>
+  </div>
+  <input type="file" id="fileInputPlanilha" accept=".xlsx" style="display:none" onchange="processarUploadPlanilha(event)">
+
+  <div class="inputbar">
+    <input id="msgInput" type="text" placeholder="Ex: Gastei R$50 no mercado" onkeydown="if(event.key==='Enter') enviarMensagem();">
+    <button class="sendbtn" id="sendBtn" onclick="enviarMensagem()">➤</button>
+  </div>
+
+  <!-- Modal: Contas a pagar -->
+  <div class="modal-overlay" id="modalContas">
+    <div class="modal">
+      <h3>📋 Contas a pagar</h3>
+      <div id="listaContas" style="font-size:13px;"></div>
+      <label>Descrição</label>
+      <input id="contaDesc" placeholder="Ex: Aluguel">
+      <label>Valor (R$)</label>
+      <input id="contaValor" type="number" placeholder="Ex: 1200">
+      <label>Dia do vencimento (1-31)</label>
+      <input id="contaDia" type="number" min="1" max="31" placeholder="Ex: 5">
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+        <button class="btn-primary" onclick="adicionarContaManual()">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Compartilhamento -->
+  <div class="modal-overlay" id="modalCompartilhar">
+    <div class="modal">
+      <h3>👥 Compartilhar</h3>
+      <p class="hint">Este site guarda os dados só neste navegador/celular, então não existe sincronização automática com outra pessoa. Você pode gerar um resumo em texto para enviar por WhatsApp sempre que quiser.</p>
+      <div id="listaCompartilhados" style="font-size:13px;"></div>
+      <label>Nome da pessoa (para lembrar quem tem acesso ao resumo)</label>
+      <input id="shareNome" placeholder="Ex: Marido, Contador...">
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+        <button class="btn-primary" onclick="adicionarCompartilhamento()">Adicionar</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" style="flex:1;" onclick="compartilharResumo()">📤 Gerar resumo para enviar agora</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Google Sheets -->
+  <div class="modal-overlay" id="modalGoogle">
+    <div class="modal">
+      <h3>🔗 Google Sheets</h3>
+      <p class="hint">Conecte uma vez sua conta Google e o ID da sua planilha. Depois disso, exportar as despesas do dia acontece direto, sem baixar nem subir arquivo nenhum.</p>
+      <div id="statusGoogle" style="font-size:12.5px; margin-top:6px;"></div>
+      <label>ID ou link da planilha do Google Sheets</label>
+      <input id="cfgSheetId" placeholder="Cole aqui o link da sua planilha">
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+        <button class="btn-primary" onclick="salvarSheetId()">Salvar ID</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" style="flex:1;" onclick="conectarGoogleSheets()">🔐 Conectar Google Sheets</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" style="flex:1; background:var(--wa-accent);" onclick="exportarParaGoogleSheets()">📤 Exportar despesas de hoje</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Configurações -->
+  <div class="modal-overlay" id="modalConfig">
+    <div class="modal">
+      <h3>⚙️ Configurações</h3>
+      <label>Renda mensal (R$)</label>
+      <input id="cfgRenda" type="number">
+      <label>Saldo disponível hoje (R$)</label>
+      <input id="cfgSaldo" type="number">
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+        <button class="btn-primary" onclick="salvarConfig()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'financeiro-site-v1';
+const CATEGORIAS = {
+  "Alimentação": ["mercado","supermercado","feira","restaurante","lanche","comida","padaria","açougue","ifood","delivery","almoço","jantar"],
+  "Transporte": ["uber","99","taxi","gasolina","combustivel","combustível","onibus","ônibus","metro","metrô","estacionamento","pedagio","pedágio"],
+  "Moradia": ["aluguel","condominio","condomínio","luz","energia","agua","água","internet","gas","gás","iptu"],
+  "Lazer": ["cinema","bar","show","viagem","passeio","netflix","streaming","festa","balada"],
+  "Saúde": ["farmacia","farmácia","remedio","remédio","medico","médico","consulta","exame","dentista","plano de saude","plano de saúde"],
+  "Educação": ["curso","livro","faculdade","escola","mensalidade","material escolar"],
+  "Compras": ["roupa","tenis","tênis","loja","shopping","sapato","eletronico","eletrônico","celular","notebook"]
+};
+
+let state = {
+  usuario: { renda_mensal: null, saldo_disponivel: null },
+  despesas: [],
+  contas_a_pagar: [],
+  compartilhamentos: [],
+  mensagens: []
+};
+
+// ---------- Persistência (localStorage, este é um site real, não um artefato) ----------
+function carregarEstado(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      state = Object.assign(state, JSON.parse(raw));
+    } else {
+      state.mensagens.push(msgBot(
+        "Oi! 👋 Sou seu assistente financeiro.\n\nComo não uso IA (esse site funciona 100% sem servidor, de graça), eu entendo por *padrões de frase* — toque em ❓ Ajuda pra ver os formatos que reconheço.\n\nPara começar, abra ⚙️ e me diga sua renda mensal e saldo disponível hoje."
+      ));
+      salvarEstado();
+    }
+  }catch(e){
+    state.mensagens.push(msgBot("Não consegui carregar dados salvos, mas podemos continuar. Abra ⚙️ para configurar sua renda e saldo."));
+  }
+  render();
+}
+function salvarEstado(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(e){
+    console.error('Erro ao salvar:', e);
+  }
+}
+
+// ---------- Utilitários ----------
+function hojeStr(){ return new Date().toISOString().slice(0,10); }
+function fmt(v){
+  if(v===null||v===undefined||isNaN(v)) return "—";
+  return "R$ " + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function horaAtual(){ return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit', minute:'2-digit'}); }
+function msgBot(texto){ return {from:'bot', text: texto, time: horaAtual()}; }
+function msgUser(texto){ return {from:'user', text: texto, time: horaAtual()}; }
+
+function diasParaVencer(dia_vencimento){
+  const hoje = new Date();
+  let venc = new Date(hoje.getFullYear(), hoje.getMonth(), dia_vencimento);
+  if(venc < hoje){ venc = new Date(hoje.getFullYear(), hoje.getMonth()+1, dia_vencimento); }
+  return Math.ceil((venc - hoje) / (1000*60*60*24));
+}
+function contasProximas(limiteDias){
+  return state.contas_a_pagar
+    .map(c => ({...c, dias: diasParaVencer(c.dia_vencimento)}))
+    .filter(c => c.dias <= limiteDias)
+    .sort((a,b)=>a.dias-b.dias);
+}
+
+// ---------- Render ----------
+function render(){
+  const chat = document.getElementById('chat');
+  chat.innerHTML = '';
+  state.mensagens.forEach(m=>{
+    const row = document.createElement('div');
+    row.className = 'bubble-row ' + (m.from==='user' ? 'out' : 'in');
+    const bub = document.createElement('div');
+    bub.className = 'bubble ' + (m.from==='user' ? 'out' : 'in');
+    bub.innerHTML = escapeAndFormat(m.text) + '<span class="time">'+m.time+'</span>';
+    row.appendChild(bub);
+    chat.appendChild(row);
+  });
+  chat.scrollTop = chat.scrollHeight;
+
+  document.getElementById('statusLine').textContent =
+    state.usuario.renda_mensal ? 'online' : 'configure sua renda para começar';
+
+  document.getElementById('cardSaldo').textContent = fmt(state.usuario.saldo_disponivel);
+  const hoje = hojeStr();
+  const totalHoje = state.despesas.filter(d=>d.data===hoje).reduce((s,d)=>s+d.valor,0);
+  document.getElementById('cardHoje').textContent = fmt(totalHoje);
+  const proximas = contasProximas(9999);
+  document.getElementById('cardConta').textContent = proximas.length>0
+    ? `${proximas[0].descricao} (${proximas[0].dias}d)`
+    : '—';
+
+  renderModalLists();
+  atualizarBadgeExportar();
+}
+
+function escapeAndFormat(text){
+  let t = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  t = t.replace(/\*(.+?)\*/g, '<b>$1</b>');
+  t = t.replace(/\n/g,'<br>');
+  return t;
+}
+
+function enviarRapido(texto){
+  document.getElementById('msgInput').value = texto;
+  enviarMensagem();
+}
+
+function enviarMensagem(){
+  const input = document.getElementById('msgInput');
+  const texto = input.value.trim();
+  if(!texto) return;
+  input.value='';
+  state.mensagens.push(msgUser(texto));
+  const resposta = processarMensagem(texto);
+  state.mensagens.push(msgBot(resposta));
+  render();
+  salvarEstado();
+}
+
+// ---------- "Cérebro" baseado em regras (sem IA) ----------
+function extrairValor(texto){
+  let m = texto.match(/r\$\s*([\d.]{1,7}(?:,\d{1,2})?)/i);
+  if(!m) m = texto.match(/(\d{1,7}(?:[.,]\d{1,2}))/);
+  if(!m) m = texto.match(/\b(\d{1,6})\b/);
+  if(!m) return null;
+  let s = m[1].replace(/\.(?=\d{3}(?:\D|$))/g,'').replace(',', '.');
+  const v = parseFloat(s);
+  return isNaN(v) ? null : v;
+}
+
+function detectarCategoria(texto){
+  const t = texto.toLowerCase();
+  for(const [cat, palavras] of Object.entries(CATEGORIAS)){
+    if(palavras.some(p => t.includes(p))) return cat;
+  }
+  return "Outros";
+}
+
+function detectarMeioPagamento(texto){
+  const m = texto.toLowerCase().match(/(pix|nubank|itau|itaú|bradesco|santander|caixa|inter|c6|cart[aã]o(?:\s+de\s+(?:cr[eé]dito|d[eé]bito))?|d[eé]bito|cr[eé]dito)/);
+  return m ? m[1] : null;
+}
+
+function processarMensagem(textoOriginal){
+  const t = textoOriginal.toLowerCase().trim();
+
+  if(['ajuda','?','help'].includes(t)) return tratarAjuda();
+  if(/\bsaldo\b|dispon[ií]vel/.test(t) && !/gastei|paguei|comprei/.test(t)) return tratarConsultaSaldo();
+  if(/relat[oó]rio/.test(t)) return tratarRelatorioDiario();
+
+  if(/todo\s*dia|dia\s*de\s*vencimento|conta\s*fixa/.test(t) || (/\bconta\b/.test(t) && /\bdia\b/.test(t))){
+    return tratarCadastroConta(textoOriginal);
+  }
+
+  if(/posso comprar|vale a pena|devo comprar|parcelar/.test(t)){
+    return tratarConsultaViabilidade(textoOriginal);
+  }
+
+  const valor = extrairValor(textoOriginal);
+  if(valor !== null && (/gastei|paguei|comprei|gasto de|foi de/.test(t) || valor)){
+    return tratarRegistroDespesa(textoOriginal, valor);
+  }
+
+  return "Não reconheci esse formato. Toque em ❓ Ajuda para ver exemplos de frases que eu entendo, ou use os botões de atalho abaixo. 😊";
+}
+
+function tratarRegistroDespesa(textoOriginal, valor){
+  const categoria = detectarCategoria(textoOriginal);
+  const meio = detectarMeioPagamento(textoOriginal);
+  const descricao = textoOriginal.replace(/r\$\s*[\d.,]+/i,'').trim();
+
+  state.despesas.push({
+    valor, categoria, descricao: descricao || textoOriginal,
+    meio_pagamento: meio, data: hojeStr()
+  });
+  if(state.usuario.saldo_disponivel !== null){
+    state.usuario.saldo_disponivel -= valor;
+  }
+
+  let resp = `✅ Registrado: *${fmt(valor)}* em *${categoria}*`;
+  if(meio) resp += ` via ${meio}`;
+  resp += '.';
+  if(state.usuario.saldo_disponivel !== null){
+    resp += `\nSaldo disponível agora: *${fmt(state.usuario.saldo_disponivel)}*`;
+  }
+  const proximas = contasProximas(5);
+  if(proximas.length>0){
+    resp += `\n\n💡 Atenção: ` + proximas.map(c => `${c.descricao} (${fmt(c.valor)}) vence em ${c.dias} dia(s)`).join('; ') + '.';
+  }
+  return resp;
+}
+
+function tratarConsultaSaldo(){
+  if(state.usuario.saldo_disponivel === null){
+    return "Ainda não tenho seu saldo. Abra ⚙️ e configure sua renda e saldo disponível.";
+  }
+  const proximas = contasProximas(7);
+  let resp = `💰 Seu saldo disponível é *${fmt(state.usuario.saldo_disponivel)}*.`;
+  if(proximas.length>0){
+    resp += `\n\nContas vencendo nos próximos 7 dias: ` + proximas.map(c=>`${c.descricao} (${fmt(c.valor)}, em ${c.dias}d)`).join(', ') + '.';
+  }
+  return resp;
+}
+
+function tratarCadastroConta(textoOriginal){
+  const valor = extrairValor(textoOriginal);
+  const diaMatch = textoOriginal.match(/dia\s*(\d{1,2})/i);
+  const dia = diaMatch ? parseInt(diaMatch[1]) : null;
+  if(valor===null || !dia){
+    return "Para cadastrar uma conta fixa, use este formato: \"Meu aluguel é R$1200 todo dia 5\" (preciso do valor e do dia do vencimento).";
+  }
+  let descricao = textoOriginal
+    .replace(/r\$\s*[\d.,]+/i,'')
+    .replace(/todo\s*dia\s*\d{1,2}/i,'')
+    .replace(/dia\s*\d{1,2}/i,'')
+    .replace(/(^|\s)(é|meu|minha|de|o|a)(\s|$)/gi,' ')
+    .replace(/(^|\s)(é|meu|minha|de|o|a)(\s|$)/gi,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+  if(!descricao) descricao = "Conta";
+
+  state.contas_a_pagar.push({ descricao, valor, dia_vencimento: dia, recorrente: true });
+  return `📋 Conta cadastrada: *${descricao}* — ${fmt(valor)}, todo dia ${dia}. Vou te avisar quando estiver perto de vencer.`;
+}
+
+function tratarRelatorioDiario(){
+  const hoje = hojeStr();
+  const despesasHoje = state.despesas.filter(d => d.data === hoje);
+  const total = despesasHoje.reduce((s,d)=>s+d.valor,0);
+  const porCategoria = {};
+  despesasHoje.forEach(d=>{ porCategoria[d.categoria] = (porCategoria[d.categoria]||0) + d.valor; });
+
+  let resp = `📊 *Relatório de hoje*\n\n`;
+  if(despesasHoje.length===0){
+    resp += "Nenhuma despesa registrada hoje. 🎉\n";
+  } else {
+    resp += `Total gasto: *${fmt(total)}*\n\nPor categoria:\n`;
+    resp += Object.entries(porCategoria).map(([c,v])=>`• ${c}: ${fmt(v)}`).join('\n');
+  }
+  if(state.usuario.saldo_disponivel !== null){
+    resp += `\n\nSaldo disponível: *${fmt(state.usuario.saldo_disponivel)}*`;
+  }
+  const proximas = contasProximas(5);
+  if(proximas.length>0){
+    resp += `\n\n⚠️ Contas próximas do vencimento: ` + proximas.map(c=>`${c.descricao} (${fmt(c.valor)}, ${c.dias}d)`).join(', ');
+  }
+  return resp;
+}
+
+function tratarAjuda(){
+  return `Aqui estão os formatos de frase que eu reconheço (sem IA, então a frase precisa ser parecida com isso):\n\n• *Registrar despesa*: "Gastei R$50 no mercado" ou "Paguei R$30 de uber no pix"\n• *Consultar saldo*: "saldo"\n• *Cadastrar conta fixa*: "Meu aluguel é R$1200 todo dia 5"\n• *Avaliar compra*: "Posso comprar um notebook de R$3000 em 12x?"\n• *Relatório*: "relatório"\n\nTambém dá pra usar os botões de atalho abaixo, e as contas/configurações pelos ícones ⚙️ 📋 👥 no topo.`;
+}
+
+function tratarConsultaViabilidade(textoOriginal){
+  const valor = extrairValor(textoOriginal);
+  if(valor===null){
+    return "Para avaliar a compra, me diga o valor. Ex: \"Posso comprar um notebook de R$3000 em 12x?\"";
+  }
+  if(state.usuario.renda_mensal === null || state.usuario.saldo_disponivel === null){
+    return "Antes de avaliar isso, preciso da sua renda mensal e saldo disponível. Configure em ⚙️.";
+  }
+  const parcelasMatch = textoOriginal.match(/(\d{1,2})\s*x\b/i) || textoOriginal.match(/(\d{1,2})\s*vezes/i);
+  const parcelas = parcelasMatch ? parseInt(parcelasMatch[1]) : 1;
+  const parcelaMensal = valor / parcelas;
+  const contasFixasMensais = state.contas_a_pagar.filter(c=>c.recorrente).reduce((s,c)=>s+c.valor,0);
+  const comprometimento = ((parcelas>1 ? parcelaMensal : 0) + contasFixasMensais) / state.usuario.renda_mensal * 100;
+  const saldoApos = parcelas===1 ? state.usuario.saldo_disponivel - valor : state.usuario.saldo_disponivel - parcelaMensal;
+  const proximas = contasProximas(30);
+  const totalProximas = proximas.reduce((s,c)=>s+c.valor,0);
+
+  let veredito, risco;
+  if(comprometimento < 15 && saldoApos > 0){
+    veredito = "Essa compra parece *viável*.";
+    risco = "Não identifiquei um risco imediato relevante com os dados que tenho.";
+  } else if(comprometimento < 30 && saldoApos > 0){
+    veredito = "Essa compra é *viável com atenção*.";
+    risco = "O comprometimento da sua renda fica em uma faixa moderada — vale acompanhar de perto no mês seguinte.";
+  } else {
+    veredito = "Essa compra parece *arriscada* no momento.";
+    risco = saldoApos <= 0
+      ? "O impacto imediato deixaria seu saldo negativo ou muito próximo disso."
+      : "O comprometimento da sua renda ficaria alto, considerando também suas contas fixas.";
+  }
+
+  let resp = `${veredito}\n\n`;
+  resp += `• Compra: ${fmt(valor)} em ${parcelas}x de ${fmt(parcelaMensal)}\n`;
+  resp += `• Comprometimento estimado da renda: ${comprometimento.toFixed(1)}%\n`;
+  resp += `• Saldo estimado após o impacto imediato: ${fmt(saldoApos)}\n`;
+  if(proximas.length>0){
+    resp += `• Contas a vencer nos próximos 30 dias: ${proximas.length} (${fmt(totalProximas)})\n`;
+  }
+  resp += `\n${risco}\n\n_Análise informativa baseada em regras simples e nos dados que você cadastrou — não substitui uma consultoria financeira formal._`;
+  return resp;
+}
+
+// ---------- Exportação para a planilha do usuário (SheetJS, tudo no navegador) ----------
+const MESES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const LINHA_INICIAL_GASTOS = 31;
+const LINHA_FINAL_GASTOS = 103;
+
+function contarPendentesExportar(){
+  return state.despesas.filter(d => !d.exportado).length;
+}
+
+function atualizarBadgeExportar(){
+  const chip = document.getElementById('chipExportar');
+  if(!chip) return;
+  const pendentes = contarPendentesExportar();
+  chip.textContent = pendentes > 0 ? `📊 Exportar (${pendentes})` : '📊 Exportar p/ planilha';
+}
+
+async function processarUploadPlanilha(event){
+  const file = event.target.files[0];
+  event.target.value = '';
+  if(!file) return;
+
+  const pendentes = state.despesas.filter(d => !d.exportado);
+  if(pendentes.length === 0){
+    state.mensagens.push(msgBot("Não há despesas novas para exportar — todas as que você registrou já foram enviadas pra planilha anteriormente."));
+    render();
+    return;
+  }
+
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+
+    const porMes = {};
+    pendentes.forEach(d => {
+      const dt = new Date(d.data + 'T00:00:00');
+      const sheetName = MESES_ABREV[dt.getMonth()];
+      (porMes[sheetName] = porMes[sheetName] || []).push({ despesa: d, data: dt });
+    });
+
+    let algumaAbaEncontrada = false;
+    let algumaAbaCheia = false;
+    let totalInserido = 0;
+
+    for(const [sheetName, itens] of Object.entries(porMes)){
+      const ws = wb.Sheets[sheetName];
+      if(!ws) continue;
+      algumaAbaEncontrada = true;
+
+      let linha = LINHA_INICIAL_GASTOS;
+      while(linha <= LINHA_FINAL_GASTOS && ws['K'+linha] && ws['K'+linha].v){ linha++; }
+
+      for(const item of itens){
+        if(linha > LINHA_FINAL_GASTOS){ algumaAbaCheia = true; break; }
+        ws['K'+linha] = { t: 's', v: item.despesa.categoria || 'Outros' };
+        ws['L'+linha] = { t: 's', v: item.despesa.descricao || '' };
+        ws['M'+linha] = { t: 'd', v: item.data, z: 'dd/mm/yyyy' };
+        ws['N'+linha] = { t: 'n', v: 1 };
+        ws['O'+linha] = { t: 's', v: item.despesa.meio_pagamento || '' };
+        ws['P'+linha] = { t: 'n', v: item.despesa.valor };
+        item.despesa.exportado = true;
+        totalInserido++;
+        linha++;
+      }
+
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      if(range.e.r < linha - 1){
+        range.e.r = linha - 1;
+        ws['!ref'] = XLSX.utils.encode_range(range);
+      }
+    }
+
+    if(!algumaAbaEncontrada){
+      state.mensagens.push(msgBot("⚠️ Não encontrei nenhuma aba de mês (Jan, Fev, Mar...) nesse arquivo. Confirma que subiu a planilha certa?"));
+      render();
+      return;
+    }
+
+    salvarEstado();
+
+    const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name.replace(/\.xlsx$/i, '') + '_atualizada.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    let resp = `✅ Exportei *${totalInserido}* despesa(s) para sua planilha, direto na tabela "Gastos do dia a dia (variáveis)" do(s) mês(es) correspondente(s).\n\nO arquivo atualizado foi baixado — substitua o antigo por ele, ou continue usando esse a partir de agora.`;
+    if(algumaAbaCheia){
+      resp += `\n\n⚠️ A tabela de algum mês já estava cheia (linha ${LINHA_FINAL_GASTOS}) e alguns lançamentos não couberam. Pode ser hora de revisar/limpar a planilha desse mês.`;
+    }
+    state.mensagens.push(msgBot(resp));
+    render();
+  }catch(e){
+    state.mensagens.push(msgBot("⚠️ Não consegui processar essa planilha (" + e.message + "). Confirma que é o arquivo .xlsx certo e que ele não está protegido/bloqueado para edição."));
+    render();
+  }
+}
+
+// ---------- Integração direta com o Google Sheets (sem servidor, OAuth no navegador) ----------
+// Substitua pelo Client ID gerado no Google Cloud Console (veja instruções no README).
+const GOOGLE_CLIENT_ID = 'COLOQUE_SEU_CLIENT_ID_AQUI.apps.googleusercontent.com';
+
+let googleAccessToken = null;
+let googleTokenClient = null;
+
+function initGoogleClient(){
+  if(googleTokenClient) return true;
+  if(!window.google || !window.google.accounts || !window.google.accounts.oauth2) return false;
+  googleTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/spreadsheets',
+    callback: (resp) => {
+      if(resp.error){
+        state.mensagens.push(msgBot("⚠️ Não consegui autorizar o acesso ao Google Sheets (" + resp.error + "). Confirme se o Client ID está configurado corretamente."));
+      } else {
+        googleAccessToken = resp.access_token;
+        state.mensagens.push(msgBot("✅ Conectado ao Google Sheets! Agora toque em \"📤 Exportar despesas de hoje\" sempre que quiser."));
+      }
+      render();
+    }
+  });
+  return true;
+}
+
+function conectarGoogleSheets(){
+  if(GOOGLE_CLIENT_ID.includes('COLOQUE_SEU_CLIENT_ID_AQUI')){
+    alert('Ainda falta configurar o Client ID do Google neste site. Veja o passo a passo que te mandei para criar o seu.');
+    return;
+  }
+  const ok = initGoogleClient();
+  if(!ok){
+    alert('A biblioteca do Google ainda está carregando. Aguarde alguns segundos e tente de novo.');
+    return;
+  }
+  googleTokenClient.requestAccessToken();
+}
+
+function extrairSheetId(input){
+  const m = input.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : input.trim();
+}
+
+function salvarSheetId(){
+  const raw = document.getElementById('cfgSheetId').value.trim();
+  if(!raw){ alert('Cole o link ou ID da sua planilha.'); return; }
+  state.usuario.google_sheet_id = extrairSheetId(raw);
+  salvarEstado();
+  atualizarStatusGoogle();
+  alert('ID da planilha salvo!');
+}
+
+function atualizarStatusGoogle(){
+  const el = document.getElementById('statusGoogle');
+  if(!el) return;
+  const partes = [];
+  partes.push(state.usuario.google_sheet_id ? '✅ Planilha configurada' : '⬜ Planilha ainda não configurada');
+  partes.push(googleAccessToken ? '✅ Conectado nesta sessão' : '⬜ Ainda não conectado nesta sessão');
+  el.innerHTML = partes.join('<br>');
+  if(state.usuario.google_sheet_id){
+    document.getElementById('cfgSheetId').value = state.usuario.google_sheet_id;
+  }
+}
+
+function formatarDataBR(date){
+  const d = String(date.getDate()).padStart(2,'0');
+  const m = String(date.getMonth()+1).padStart(2,'0');
+  const y = date.getFullYear();
+  return `${d}/${m}/${y}`;
+}
+
+async function exportarParaGoogleSheets(){
+  const pendentes = state.despesas.filter(d => !d.exportado);
+  if(pendentes.length === 0){
+    state.mensagens.push(msgBot("Não há despesas novas para exportar."));
+    render();
+    return;
+  }
+  if(!state.usuario.google_sheet_id){
+    state.mensagens.push(msgBot("Configure o ID da sua planilha do Google (ícone 🔗) antes de exportar."));
+    render();
+    return;
+  }
+  if(!googleAccessToken){
+    state.mensagens.push(msgBot('Primeiro toque em "🔐 Conectar Google Sheets" (ícone 🔗) para autorizar o acesso.'));
+    render();
+    return;
+  }
+
+  const sheetId = state.usuario.google_sheet_id;
+  const porMes = {};
+  pendentes.forEach(d => {
+    const dt = new Date(d.data + 'T00:00:00');
+    const nome = MESES_ABREV[dt.getMonth()];
+    (porMes[nome] = porMes[nome] || []).push({ despesa: d, data: dt });
+  });
+
+  let totalInserido = 0;
+  let erros = [];
+
+  for(const [sheetName, itens] of Object.entries(porMes)){
+    try{
+      const rangeLeitura = `${sheetName}!K${LINHA_INICIAL_GASTOS}:K${LINHA_FINAL_GASTOS}`;
+      const getResp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeLeitura)}`,
+        { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+      );
+      if(!getResp.ok) throw new Error(`Falha ao ler a aba "${sheetName}" (HTTP ${getResp.status})`);
+      const getData = await getResp.json();
+      const linhasExistentes = (getData.values || []).length;
+      let linha = LINHA_INICIAL_GASTOS + linhasExistentes;
+
+      const itensQueCabem = [];
+      for(const item of itens){
+        if(linha + itensQueCabem.length > LINHA_FINAL_GASTOS) break;
+        itensQueCabem.push(item);
+      }
+      if(itensQueCabem.length === 0){
+        erros.push(`A tabela do mês "${sheetName}" já está cheia.`);
+        continue;
+      }
+
+      const valores = itensQueCabem.map(item => [
+        item.despesa.categoria || 'Outros',
+        item.despesa.descricao || '',
+        formatarDataBR(item.data),
+        1,
+        item.despesa.meio_pagamento || '',
+        item.despesa.valor
+      ]);
+
+      const rangeEscrita = `${sheetName}!K${linha}:P${linha + valores.length - 1}`;
+      const putResp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeEscrita)}?valueInputOption=USER_ENTERED`,
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${googleAccessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ range: rangeEscrita, values: valores })
+        }
+      );
+      if(!putResp.ok) throw new Error(`Falha ao escrever na aba "${sheetName}" (HTTP ${putResp.status})`);
+
+      itensQueCabem.forEach(item => { item.despesa.exportado = true; });
+      totalInserido += itensQueCabem.length;
+    }catch(e){
+      erros.push(e.message);
+    }
+  }
+
+  salvarEstado();
+  render();
+
+  let resp = totalInserido > 0
+    ? `✅ Exportei *${totalInserido}* despesa(s) direto pra sua planilha do Google Sheets.`
+    : "Não consegui exportar nenhuma despesa agora.";
+  if(erros.length > 0){
+    resp += `\n\n⚠️ ${erros.join(' ')}`;
+  }
+  state.mensagens.push(msgBot(resp));
+  render();
+}
+
+// ---------- Modais ----------
+function abrirModal(tipo){
+  fecharModal();
+  if(tipo==='contas') document.getElementById('modalContas').classList.add('open');
+  if(tipo==='compartilhar') document.getElementById('modalCompartilhar').classList.add('open');
+  if(tipo==='google'){
+    document.getElementById('modalGoogle').classList.add('open');
+    atualizarStatusGoogle();
+  }
+  if(tipo==='config'){
+    document.getElementById('cfgRenda').value = state.usuario.renda_mensal ?? '';
+    document.getElementById('cfgSaldo').value = state.usuario.saldo_disponivel ?? '';
+    document.getElementById('modalConfig').classList.add('open');
+  }
+  renderModalLists();
+}
+function fecharModal(){
+  document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));
+}
+function renderModalLists(){
+  const lc = document.getElementById('listaContas');
+  if(lc){
+    lc.innerHTML = state.contas_a_pagar.length===0
+      ? '<p style="color:#888;">Nenhuma conta cadastrada ainda.</p>'
+      : state.contas_a_pagar.map((c,i)=>`<div class="share-item"><span>${c.descricao} — ${fmt(c.valor)}<br><span class="perm">dia ${c.dia_vencimento}</span></span><span class="share-remove" onclick="removerConta(${i})">remover</span></div>`).join('');
+  }
+  const lp = document.getElementById('listaCompartilhados');
+  if(lp){
+    lp.innerHTML = state.compartilhamentos.length===0
+      ? '<p style="color:#888;">Nenhum contato salvo ainda.</p>'
+      : state.compartilhamentos.map((p,i)=>`<div class="share-item"><span>${p.nome}</span><span class="share-remove" onclick="removerCompartilhamento(${i})">remover</span></div>`).join('');
+  }
+}
+
+function adicionarContaManual(){
+  const desc = document.getElementById('contaDesc').value.trim();
+  const valor = parseFloat(document.getElementById('contaValor').value);
+  const dia = parseInt(document.getElementById('contaDia').value);
+  if(!desc || isNaN(valor) || isNaN(dia)){ alert('Preencha todos os campos.'); return; }
+  state.contas_a_pagar.push({descricao:desc, valor, dia_vencimento:dia, recorrente:true});
+  document.getElementById('contaDesc').value='';
+  document.getElementById('contaValor').value='';
+  document.getElementById('contaDia').value='';
+  salvarEstado();
+  render();
+}
+function removerConta(i){
+  state.contas_a_pagar.splice(i,1);
+  salvarEstado();
+  render();
+}
+
+function adicionarCompartilhamento(){
+  const nome = document.getElementById('shareNome').value.trim();
+  if(!nome){ alert('Informe o nome da pessoa.'); return; }
+  state.compartilhamentos.push({nome});
+  document.getElementById('shareNome').value='';
+  salvarEstado();
+  render();
+}
+function removerCompartilhamento(i){
+  state.compartilhamentos.splice(i,1);
+  salvarEstado();
+  render();
+}
+
+function compartilharResumo(){
+  const texto = tratarRelatorioDiario().replace(/\*/g,'');
+  if(navigator.share){
+    navigator.share({ title: 'Resumo financeiro', text: texto }).catch(()=>{});
+  } else {
+    navigator.clipboard?.writeText(texto);
+    alert('Resumo copiado! Cole no WhatsApp para enviar.');
+  }
+}
+
+function salvarConfig(){
+  const renda = parseFloat(document.getElementById('cfgRenda').value);
+  const saldo = parseFloat(document.getElementById('cfgSaldo').value);
+  if(!isNaN(renda)) state.usuario.renda_mensal = renda;
+  if(!isNaN(saldo)) state.usuario.saldo_disponivel = saldo;
+  salvarEstado();
+  fecharModal();
+  render();
+}
+
+carregarEstado();
+</script>
+</body>
+</html>

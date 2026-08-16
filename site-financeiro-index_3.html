@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Meu Assistente Financeiro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --wa-header:#075E54;
+    --wa-header-dark:#054C40;
+    --wa-bg:#E7DFD5;
+    --wa-bubble-in:#FFFFFF;
+    --wa-bubble-out:#DCF8C6;
+    --wa-text:#1F2C34;
+    --wa-text-soft:#667781;
+    --wa-accent:#25D366;
+    --wa-danger:#D9534F;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0; height:100%;}
+  body{
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    background:#0B141A;
+    display:flex;
+    justify-content:center;
+  }
+  .app{
+    width:100%;
+    max-width:480px;
+    height:100vh;
+    background:var(--wa-bg);
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+  .header{
+    background:var(--wa-header);
+    color:#fff;
+    padding:14px 16px;
+    padding-top:calc(14px + env(safe-area-inset-top));
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-shrink:0;
+  }
+  .avatar{
+    width:38px;height:38px;border-radius:50%;
+    background:linear-gradient(135deg,#25D366,#128C7E);
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;
+    flex-shrink:0;
+  }
+  .header-info{flex:1; min-width:0;}
+  .header-info .name{font-size:15.5px;font-weight:600;}
+  .header-info .status{font-size:11.5px;color:#CFE9E2;}
+  .header-icons{display:flex;gap:14px;font-size:17px;opacity:.9;cursor:pointer;}
+
+  .summary{
+    display:flex;
+    gap:8px;
+    padding:10px 10px 0;
+    flex-shrink:0;
+  }
+  .summary-card{
+    flex:1;
+    background:#fff;
+    border-radius:10px;
+    padding:8px 10px;
+    text-align:center;
+  }
+  .summary-card .label{font-size:10.5px; color:var(--wa-text-soft);}
+  .summary-card .value{font-size:14px; font-weight:700; color:var(--wa-header-dark); margin-top:2px;}
+
+  .chat{
+    flex:1;
+    overflow-y:auto;
+    padding:10px 10px;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .bubble-row{display:flex; margin:3px 0;}
+  .bubble-row.out{justify-content:flex-end;}
+  .bubble{
+    max-width:82%;
+    padding:7px 10px 8px 10px;
+    border-radius:8px;
+    font-size:14px;
+    line-height:1.38;
+    white-space:pre-wrap;
+    box-shadow:0 1px 0.5px rgba(0,0,0,.13);
+  }
+  .bubble.in{background:var(--wa-bubble-in); color:var(--wa-text); border-top-left-radius:2px;}
+  .bubble.out{background:var(--wa-bubble-out); color:var(--wa-text); border-top-right-radius:2px;}
+  .bubble .time{display:block; text-align:right; font-size:10.5px; color:var(--wa-text-soft); margin-top:3px;}
+  .bubble b{font-weight:700;}
+
+  .quickbar{
+    display:flex;
+    gap:6px;
+    padding:8px 10px 4px;
+    overflow-x:auto;
+    background:var(--wa-bg);
+    flex-shrink:0;
+  }
+  .chip{
+    background:#fff;
+    border:1px solid #d6cfc3;
+    border-radius:16px;
+    padding:6px 12px;
+    font-size:12.5px;
+    color:var(--wa-header-dark);
+    white-space:nowrap;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+
+  .inputbar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 10px;
+    padding-bottom:calc(8px + env(safe-area-inset-bottom));
+    background:#F0EBE3;
+    flex-shrink:0;
+  }
+  .inputbar input{
+    flex:1;
+    border:none;
+    border-radius:20px;
+    padding:11px 14px;
+    font-size:14px;
+    outline:none;
+  }
+  .sendbtn{
+    width:40px;height:40px;
+    border-radius:50%;
+    background:var(--wa-header);
+    color:#fff;
+    border:none;
+    font-size:16px;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+
+  .modal-overlay{
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.45);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:20;
+    padding:16px;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal{
+    background:#fff;
+    width:100%;
+    max-width:400px;
+    max-height:82vh;
+    overflow-y:auto;
+    border-radius:12px;
+    padding:16px;
+  }
+  .modal h3{margin:0 0 10px; color:var(--wa-header-dark); font-size:16px;}
+  .modal p.hint{font-size:12px; color:var(--wa-text-soft); margin-top:-4px;}
+  .modal label{display:block; font-size:12px; color:var(--wa-text-soft); margin-top:10px;}
+  .modal input, .modal select{
+    width:100%; padding:9px; margin-top:4px; border:1px solid #ddd; border-radius:6px; font-size:14px;
+  }
+  .modal-actions{display:flex; gap:8px; margin-top:16px;}
+  .modal-actions button{
+    flex:1; padding:11px; border:none; border-radius:8px; font-size:13px; cursor:pointer;
+  }
+  .btn-primary{background:var(--wa-header); color:#fff;}
+  .btn-secondary{background:#eee; color:#333;}
+  .share-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 0; border-bottom:1px solid #eee; font-size:13px;
+  }
+  .share-item .perm{font-size:11px; color:var(--wa-text-soft);}
+  .share-remove{color:var(--wa-danger); cursor:pointer; font-size:12px;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <div class="avatar">💰</div>
+    <div class="header-info">
+      <div class="name">Meu Assistente Financeiro</div>
+      <div class="status" id="statusLine">configure sua renda para começar</div>
+    </div>
+    <div class="header-icons">
+      <span title="Contas a pagar" onclick="abrirModal('contas')">📋</span>
+      <span title="Google Sheets" onclick="abrirModal('google')">🔗</span>
+      <span title="Compartilhar" onclick="abrirModal('compartilhar')">👥</span>
+      <span title="Configurações" onclick="abrirModal('config')">⚙️</span>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="summary-card">
+      <div class="label">Saldo</div>
+      <div class="value" id="cardSaldo">—</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Gasto hoje</div>
+      <div class="value" id="cardHoje">—</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Próx. conta</div>
+      <div class="value" id="cardConta">—</div>
+    </div>
+  </div>
+
+  <div class="chat" id="chat"></div>
+
+  <div class="quickbar">
+    <div class="chip" onclick="enviarRapido('saldo')">💰 Saldo</div>
+    <div class="chip" onclick="enviarRapido('relatório')">📊 Relatório</div>
+    <div class="chip" onclick="abrirModal('despesas')">🧾 Despesas</div>
+    <div class="chip" onclick="abrirModal('contas')">📋 Contas</div>
+    <div class="chip" onclick="abrirModal('receitas')">💵 Receitas</div>
+    <div class="chip" onclick="abrirModal('investimentos')">📈 Investimentos</div>
+    <div class="chip" onclick="abrirModal('metas')">🎯 Metas</div>
+    <div class="chip" onclick="abrirModal('compartilhar')">👥 Compartilhar</div>
+    <div class="chip" id="chipExportar" onclick="document.getElementById('fileInputPlanilha').click()">📊 Exportar p/ planilha</div>
+    <div class="chip" onclick="enviarRapido('ajuda')">❓ Ajuda</div>
+  </div>
+  <input type="file" id="fileInputPlanilha" accept=".xlsx" style="display:none" onchange="processarUploadPlanilha(event)">
+
+  <div class="inputbar">
+    <input id="msgInput" type="text" placeholder="Ex: Gastei R$50 no mercado" onkeydown="if(event.key==='Enter') enviarMensagem();">
+    <button class="sendbtn" id="sendBtn" onclick="enviarMensagem()">➤</button>
+  </div>
+
+  <!-- Modal: Receitas -->
+  <div class="modal-overlay" id="modalReceitas">
+    <div class="modal">
+      <h3>💵 Receitas</h3>
+      <div id="listaReceitas" style="font-size:13px; max-height:300px; overflow-y:auto;"></div>
+      <label>Descrição</label>
+      <input id="receitaDesc" placeholder="Ex: Freelancer">
+      <label>Valor (R$)</label>
+      <input id="receitaValor" type="number" placeholder="Ex: 3000">
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+        <button class="btn-primary" onclick="adicionarReceitaManual()">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Investimentos -->
+  <div class="modal-overlay" id="modalInvestimentos">
+    <div class="modal">
+      <h3>📈 Investimentos do mês</h3>
+      <p class="hint">Isso alimenta a seção "Quanto vou guardar/investir?" de cada mês na sua planilha (limite de 5 lançamentos por mês na planilha).</p>
+      <div id="listaInvestimentos" style="font-size:13px; max-height:280px; overflow-y:auto;"></div>
+      <label>Local (banco, corretora, etc.)</label>
+      <input id="investLocal" placeholder="Ex: Tesouro Direto">
+      <label>Valor (R$)</label>
+      <input id="investValor" type="number" placeholder="Ex: 300">
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+        <button class="btn-primary" onclick="adicionarInvestimentoManual()">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Metas -->
+  <div class="modal-overlay" id="modalMetas">
+    <div class="modal">
+      <h3>🎯 Metas financeiras</h3>
+      <p class="hint">Sua planilha tem espaço para até 4 metas simultâneas.</p>
+      <div id="listaMetas" style="font-size:13px; max-height:300px; overflow-y:auto;"></div>
+      <label>Nome da nova meta</label>
+      <input id="metaNome" placeholder="Ex: Viagem">
+      <label>Valor total da meta (R$)</label>
+      <input id="metaValor" type="number" placeholder="Ex: 5000">
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+        <button class="btn-primary" onclick="adicionarMetaManual()">Criar meta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Despesas registradas -->
+  <div class="modal-overlay" id="modalDespesas">
+    <div class="modal">
+      <h3>🧾 Despesas registradas</h3>
+      <p class="hint">Mostrando as mais recentes primeiro. Remover aqui devolve o valor ao seu saldo. Se a despesa já tinha sido exportada pra planilha, a remoção aqui <b>não</b> apaga a linha de lá — você precisa apagar manualmente na planilha também.</p>
+      <div id="listaDespesas" style="font-size:13px; max-height:340px; overflow-y:auto;"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" style="flex:1;" onclick="fecharModal()">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Contas a pagar -->
+  <div class="modal-overlay" id="modalContas">
+    <div class="modal">
+      <h3>📋 Contas a pagar</h3>
+      <div id="listaContas" style="font-size:13px;"></div>
+      <label>Descrição</label>
+      <input id="contaDesc" placeholder="Ex: Aluguel">
+      <label>Valor (R$)</label>
+      <input id="contaValor" type="number" placeholder="Ex: 1200">
+      <label>Dia do vencimento (1-31)</label>
+      <input id="contaDia" type="number" min="1" max="31" placeholder="Ex: 5">
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+        <button class="btn-primary" onclick="adicionarContaManual()">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Compartilhamento -->
+  <div class="modal-overlay" id="modalCompartilhar">
+    <div class="modal">
+      <h3>👥 Compartilhar</h3>
+      <p class="hint">Este site guarda os dados só neste navegador/celular, então não existe sincronização automática com outra pessoa. Você pode gerar um resumo em texto para enviar por WhatsApp sempre que quiser.</p>
+      <div id="listaCompartilhados" style="font-size:13px;"></div>
+      <label>Nome da pessoa (para lembrar quem tem acesso ao resumo)</label>
+      <input id="shareNome" placeholder="Ex: Marido, Contador...">
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+        <button class="btn-primary" onclick="adicionarCompartilhamento()">Adicionar</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" style="flex:1;" onclick="compartilharResumo()">📤 Gerar resumo para enviar agora</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Google Sheets -->
+  <div class="modal-overlay" id="modalGoogle">
+    <div class="modal">
+      <h3>🔗 Google Sheets</h3>
+      <p class="hint">Conecte uma vez sua conta Google e o ID da sua planilha. Depois disso, "Exportar tudo" envia despesas, receitas, investimentos do mês e depósitos em metas direto, sem baixar nem subir arquivo nenhum.</p>
+      <div id="statusGoogle" style="font-size:12.5px; margin-top:6px;"></div>
+      <label>ID ou link da planilha do Google Sheets</label>
+      <input id="cfgSheetId" placeholder="Cole aqui o link da sua planilha">
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+        <button class="btn-primary" onclick="salvarSheetId()">Salvar ID</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" style="flex:1;" onclick="conectarGoogleSheets()">🔐 Conectar Google Sheets</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" style="flex:1; background:var(--wa-accent);" onclick="exportarParaGoogleSheets()">📤 Exportar tudo</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" style="flex:1; background:#5B5FEF;" onclick="importarDeGoogleSheets()">📥 Importar despesas da planilha</button>
+      </div>
+      <p class="hint">A importação traz de volta o histórico de despesas já exportadas (útil se você perder os dados deste aparelho). Renda, saldo e contas fixas não são recuperados por aqui — precisam ser reconfigurados manualmente.</p>
+    </div>
+  </div>
+
+  <!-- Modal: Configurações -->
+  <div class="modal-overlay" id="modalConfig">
+    <div class="modal">
+      <h3>⚙️ Configurações</h3>
+      <label>Renda mensal (R$)</label>
+      <input id="cfgRenda" type="number">
+      <label>Saldo disponível hoje (R$)</label>
+      <input id="cfgSaldo" type="number">
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+        <button class="btn-primary" onclick="salvarConfig()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'financeiro-site-v1';
+const CATEGORIAS = {
+  "Alimentação": ["mercado","supermercado","feira","restaurante","lanche","comida","padaria","açougue","ifood","delivery","almoço","jantar"],
+  "Transporte": ["uber","99pop","taxi","gasolina","combustivel","combustível","onibus","ônibus","metro","metrô","estacionamento","pedagio","pedágio"],
+  "Moradia": ["aluguel","condominio","condomínio","luz","energia","agua","água","internet","gas","gás","iptu"],
+  "Lazer": ["cinema","bar","show","viagem","passeio","netflix","streaming","festa","balada"],
+  "Saúde": ["farmacia","farmácia","remedio","remédio","medico","médico","consulta","exame","dentista","plano de saude","plano de saúde"],
+  "Educação": ["curso","livro","faculdade","escola","mensalidade","material escolar"],
+  "Compras": ["roupa","tenis","tênis","loja","shopping","sapato","eletronico","eletrônico","celular","notebook"]
+};
+
+let state = {
+  usuario: { renda_mensal: null, saldo_disponivel: null },
+  despesas: [],
+  contas_a_pagar: [],
+  receitas: [],
+  investimentos: [],
+  metas: [],
+  compartilhamentos: [],
+  mensagens: []
+};
+
+// ---------- Persistência (localStorage, este é um site real, não um artefato) ----------
+function carregarEstado(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      state = Object.assign(state, JSON.parse(raw));
+    } else {
+      state.mensagens.push(msgBot(
+        "Oi! 👋 Sou seu assistente financeiro.\n\nComo não uso IA (esse site funciona 100% sem servidor, de graça), eu entendo por *padrões de frase* — toque em ❓ Ajuda pra ver os formatos que reconheço.\n\nPara começar, abra ⚙️ e me diga sua renda mensal e saldo disponível hoje."
+      ));
+      salvarEstado();
+    }
+  }catch(e){
+    state.mensagens.push(msgBot("Não consegui carregar dados salvos, mas podemos continuar. Abra ⚙️ para configurar sua renda e saldo."));
+  }
+  render();
+}
+function salvarEstado(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(e){
+    console.error('Erro ao salvar:', e);
+  }
+}
+
+// ---------- Utilitários ----------
+function hojeStr(){ return new Date().toISOString().slice(0,10); }
+function fmt(v){
+  if(v===null||v===undefined||isNaN(v)) return "—";
+  return "R$ " + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function horaAtual(){ return new Date().toLocaleTimeString('pt-BR',{hour:'2-digit', minute:'2-digit'}); }
+function msgBot(texto){ return {from:'bot', text: texto, time: horaAtual()}; }
+function msgUser(texto){ return {from:'user', text: texto, time: horaAtual()}; }
+
+function diasParaVencer(dia_vencimento){
+  const hoje = new Date();
+  let venc = new Date(hoje.getFullYear(), hoje.getMonth(), dia_vencimento);
+  if(venc < hoje){ venc = new Date(hoje.getFullYear(), hoje.getMonth()+1, dia_vencimento); }
+  return Math.ceil((venc - hoje) / (1000*60*60*24));
+}
+function contasProximas(limiteDias){
+  return state.contas_a_pagar
+    .map(c => ({...c, dias: diasParaVencer(c.dia_vencimento)}))
+    .filter(c => c.dias <= limiteDias)
+    .sort((a,b)=>a.dias-b.dias);
+}
+
+// ---------- Render ----------
+function render(){
+  const chat = document.getElementById('chat');
+  chat.innerHTML = '';
+  state.mensagens.forEach(m=>{
+    const row = document.createElement('div');
+    row.className = 'bubble-row ' + (m.from==='user' ? 'out' : 'in');
+    const bub = document.createElement('div');
+    bub.className = 'bubble ' + (m.from==='user' ? 'out' : 'in');
+    bub.innerHTML = escapeAndFormat(m.text) + '<span class="time">'+m.time+'</span>';
+    row.appendChild(bub);
+    chat.appendChild(row);
+  });
+  chat.scrollTop = chat.scrollHeight;
+
+  document.getElementById('statusLine').textContent =
+    state.usuario.renda_mensal ? 'online' : 'configure sua renda para começar';
+
+  document.getElementById('cardSaldo').textContent = fmt(state.usuario.saldo_disponivel);
+  const hoje = hojeStr();
+  const totalHoje = state.despesas.filter(d=>d.data===hoje).reduce((s,d)=>s+d.valor,0);
+  document.getElementById('cardHoje').textContent = fmt(totalHoje);
+  const proximas = contasProximas(9999);
+  document.getElementById('cardConta').textContent = proximas.length>0
+    ? `${proximas[0].descricao} (${proximas[0].dias}d)`
+    : '—';
+
+  renderModalLists();
+  atualizarBadgeExportar();
+}
+
+function escapeAndFormat(text){
+  let t = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  t = t.replace(/\*(.+?)\*/g, '<b>$1</b>');
+  t = t.replace(/\n/g,'<br>');
+  return t;
+}
+
+function enviarRapido(texto){
+  document.getElementById('msgInput').value = texto;
+  enviarMensagem();
+}
+
+function enviarMensagem(){
+  const input = document.getElementById('msgInput');
+  const texto = input.value.trim();
+  if(!texto) return;
+  input.value='';
+  state.mensagens.push(msgUser(texto));
+  const resposta = processarMensagem(texto);
+  state.mensagens.push(msgBot(resposta));
+  render();
+  salvarEstado();
+}
+
+// ---------- "Cérebro" baseado em regras (sem IA) ----------
+function extrairValor(texto){
+  let m = texto.match(/r\$\s*([\d.]{1,7}(?:,\d{1,2})?)/i);
+  if(!m) m = texto.match(/(\d{1,7}(?:[.,]\d{1,2}))/);
+  if(!m) m = texto.match(/\b(\d{1,6})\b/);
+  if(!m) return null;
+  let s = m[1].replace(/\.(?=\d{3}(?:\D|$))/g,'').replace(',', '.');
+  const v = parseFloat(s);
+  return isNaN(v) ? null : v;
+}
+
+function detectarCategoria(texto){
+  const t = texto.toLowerCase();
+  for(const [cat, palavras] of Object.entries(CATEGORIAS)){
+    for(const p of palavras){
+      const escapado = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if(new RegExp('\\b' + escapado + '\\b', 'i').test(t)) return cat;
+    }
+  }
+  return "Outros";
+}
+
+function detectarMeioPagamento(texto){
+  const m = texto.toLowerCase().match(/(pix|nubank|itau|itaú|bradesco|santander|caixa|inter|c6|cart[aã]o(?:\s+de\s+(?:cr[eé]dito|d[eé]bito))?|d[eé]bito|cr[eé]dito)/);
+  return m ? m[1] : null;
+}
+
+function dataParaISO(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dia = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dia}`;
+}
+
+// Reconhece referências de data numa frase de despesa: "ontem", "anteontem",
+// "dia 10", "dia 10/08", "10/08" ou "10/08/2026". Se nada for encontrado, retorna null
+// (nesse caso quem chamar deve usar a data de hoje).
+function extrairDataDespesa(texto){
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  let m;
+
+  m = texto.match(/\bantes\s*de\s*ontem\b|\banteontem\b/i);
+  if(m){
+    const d = new Date(hoje); d.setDate(d.getDate() - 2);
+    return { data: d, trecho: m[0] };
+  }
+  m = texto.match(/\bontem\b/i);
+  if(m){
+    const d = new Date(hoje); d.setDate(d.getDate() - 1);
+    return { data: d, trecho: m[0] };
+  }
+  m = texto.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+  if(m){
+    const dia = parseInt(m[1]), mes = parseInt(m[2]) - 1;
+    let ano = m[3] ? parseInt(m[3]) : hoje.getFullYear();
+    if(ano < 100) ano += 2000;
+    const d = new Date(ano, mes, dia);
+    if(!isNaN(d.getTime())) return { data: d, trecho: m[0] };
+  }
+  m = texto.match(/\bdia\s+(\d{1,2})\b/i);
+  if(m){
+    const dia = parseInt(m[1]);
+    if(dia >= 1 && dia <= 31){
+      let d = new Date(hoje.getFullYear(), hoje.getMonth(), dia);
+      if(d > hoje){ d = new Date(hoje.getFullYear(), hoje.getMonth() - 1, dia); }
+      return { data: d, trecho: m[0] };
+    }
+  }
+  return null;
+}
+
+function processarMensagem(textoOriginal){
+  const t = textoOriginal.toLowerCase().trim();
+
+  if(['ajuda','?','help'].includes(t)) return tratarAjuda();
+  if(/desfazer|apagar|excluir|remover|cancelar/.test(t) && /[uú]ltim[ao]/.test(t)){
+    return desfazerUltimaDespesa();
+  }
+  if(/\bsaldo\b|dispon[ií]vel/.test(t) && !/gastei|paguei|comprei/.test(t)) return tratarConsultaSaldo();
+  if(/relat[oó]rio/.test(t)){
+    const infoData = extrairDataDespesa(textoOriginal);
+    return tratarRelatorioDiario(infoData ? dataParaISO(infoData.data) : null);
+  }
+
+  if(/todo\s*dia|dia\s*de\s*vencimento|conta\s*fixa/.test(t) || (/\bconta\b/.test(t) && /\bdia\b/.test(t))){
+    return tratarCadastroConta(textoOriginal);
+  }
+
+  if(/posso comprar|vale a pena|devo comprar|parcelar/.test(t)){
+    return tratarConsultaViabilidade(textoOriginal);
+  }
+
+  if(/nova meta|minha meta [ée]/.test(t)){
+    return tratarCadastroMeta(textoOriginal);
+  }
+  if((/guardei|depositei/.test(t)) && /\bmeta\b/.test(t)){
+    const valorMeta = extrairValor(textoOriginal);
+    if(valorMeta === null) return 'Me diga o valor que você guardou. Ex: "Guardei R$200 na meta viagem".';
+    return tratarDepositoMeta(textoOriginal, valorMeta);
+  }
+  if(/\binvesti\b/.test(t)){
+    const valorInv = extrairValor(textoOriginal);
+    if(valorInv === null) return 'Me diga o valor investido. Ex: "Investi R$300 no Tesouro Direto".';
+    return tratarRegistroInvestimento(textoOriginal, valorInv);
+  }
+  if(/\brecebi\b|\bganhei\b/.test(t)){
+    const valorReceita = extrairValor(textoOriginal);
+    if(valorReceita === null) return 'Me diga o valor recebido. Ex: "Recebi R$3000 de freelancer".';
+    return tratarRegistroReceita(textoOriginal, valorReceita);
+  }
+
+  const valor = extrairValor(textoOriginal);
+  if(valor !== null && (/gastei|paguei|comprei|gasto de|foi de/.test(t) || valor)){
+    return tratarRegistroDespesa(textoOriginal);
+  }
+
+  return "Não reconheci esse formato. Toque em ❓ Ajuda para ver exemplos de frases que eu entendo, ou use os botões de atalho abaixo. 😊";
+}
+
+function tratarRegistroDespesa(textoOriginal){
+  const infoData = extrairDataDespesa(textoOriginal);
+  const textoLimpo = infoData ? textoOriginal.replace(infoData.trecho, '') : textoOriginal;
+  const valor = extrairValor(textoLimpo);
+  if(valor === null){
+    return 'Entendi que foi um gasto, mas não identifiquei o valor. Pode me dizer quanto foi? Ex: "Gastei R$45 no mercado".';
+  }
+  const categoria = detectarCategoria(textoLimpo);
+  const meio = detectarMeioPagamento(textoLimpo);
+  const descricao = textoLimpo.replace(/r\$\s*[\d.,]+/i,'').trim();
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const dataFinal = infoData ? infoData.data : hoje;
+  const dataISO = dataParaISO(dataFinal);
+
+  state.despesas.push({
+    valor, categoria, descricao: descricao || textoOriginal,
+    meio_pagamento: meio, data: dataISO
+  });
+  if(state.usuario.saldo_disponivel !== null){
+    state.usuario.saldo_disponivel -= valor;
+  }
+
+  let resp = `✅ Registrado: *${fmt(valor)}* em *${categoria}*`;
+  if(meio) resp += ` via ${meio}`;
+  if(dataISO !== dataParaISO(hoje)){
+    resp += ` (data: ${formatarDataBR(dataFinal)})`;
+  }
+  resp += '.';
+  if(state.usuario.saldo_disponivel !== null){
+    resp += `\nSaldo disponível agora: *${fmt(state.usuario.saldo_disponivel)}*`;
+  }
+  const proximas = contasProximas(5);
+  if(proximas.length>0){
+    resp += `\n\n💡 Atenção: ` + proximas.map(c => `${c.descricao} (${fmt(c.valor)}) vence em ${c.dias} dia(s)`).join('; ') + '.';
+  }
+  return resp;
+}
+
+function tratarConsultaSaldo(){
+  if(state.usuario.saldo_disponivel === null){
+    return "Ainda não tenho seu saldo. Abra ⚙️ e configure sua renda e saldo disponível.";
+  }
+  const proximas = contasProximas(7);
+  let resp = `💰 Seu saldo disponível é *${fmt(state.usuario.saldo_disponivel)}*.`;
+  if(proximas.length>0){
+    resp += `\n\nContas vencendo nos próximos 7 dias: ` + proximas.map(c=>`${c.descricao} (${fmt(c.valor)}, em ${c.dias}d)`).join(', ') + '.';
+  }
+  return resp;
+}
+
+function tratarCadastroConta(textoOriginal){
+  const valor = extrairValor(textoOriginal);
+  const diaMatch = textoOriginal.match(/dia\s*(\d{1,2})/i);
+  const dia = diaMatch ? parseInt(diaMatch[1]) : null;
+  if(valor===null || !dia){
+    return "Para cadastrar uma conta fixa, use este formato: \"Meu aluguel é R$1200 todo dia 5\" (preciso do valor e do dia do vencimento).";
+  }
+  let descricao = textoOriginal
+    .replace(/r\$\s*[\d.,]+/i,'')
+    .replace(/todo\s*dia\s*\d{1,2}/i,'')
+    .replace(/dia\s*\d{1,2}/i,'')
+    .replace(/(^|\s)(é|meu|minha|de|o|a)(\s|$)/gi,' ')
+    .replace(/(^|\s)(é|meu|minha|de|o|a)(\s|$)/gi,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+  if(!descricao) descricao = "Conta";
+
+  state.contas_a_pagar.push({ descricao, valor, dia_vencimento: dia, recorrente: true });
+  return `📋 Conta cadastrada: *${descricao}* — ${fmt(valor)}, todo dia ${dia}. Vou te avisar quando estiver perto de vencer.`;
+}
+
+function tratarRelatorioDiario(dataAlvoISO){
+  const hoje = hojeStr();
+  const dataAlvo = dataAlvoISO || hoje;
+  const ehHoje = dataAlvo === hoje;
+  const despesasDoDia = state.despesas.filter(d => d.data === dataAlvo);
+  const total = despesasDoDia.reduce((s,d)=>s+d.valor,0);
+  const porCategoria = {};
+  despesasDoDia.forEach(d=>{ porCategoria[d.categoria] = (porCategoria[d.categoria]||0) + d.valor; });
+
+  const rotuloData = ehHoje ? 'hoje' : formatarDataBR(new Date(dataAlvo + 'T00:00:00'));
+  let resp = `📊 *Relatório de ${rotuloData}*\n\n`;
+  if(despesasDoDia.length===0){
+    resp += ehHoje ? "Nenhuma despesa registrada hoje. 🎉\n" : "Nenhuma despesa registrada nessa data.\n";
+  } else {
+    resp += `Total gasto: *${fmt(total)}*\n\nPor categoria:\n`;
+    resp += Object.entries(porCategoria).map(([c,v])=>`• ${c}: ${fmt(v)}`).join('\n');
+  }
+  if(ehHoje && state.usuario.saldo_disponivel !== null){
+    resp += `\n\nSaldo disponível: *${fmt(state.usuario.saldo_disponivel)}*`;
+  } else if(!ehHoje && state.usuario.saldo_disponivel !== null){
+    resp += `\n\n(Saldo disponível hoje, ${formatarDataBR(new Date(hoje + 'T00:00:00'))}: ${fmt(state.usuario.saldo_disponivel)})`;
+  }
+  if(ehHoje){
+    const proximas = contasProximas(5);
+    if(proximas.length>0){
+      resp += `\n\n⚠️ Contas próximas do vencimento: ` + proximas.map(c=>`${c.descricao} (${fmt(c.valor)}, ${c.dias}d)`).join(', ');
+    }
+  }
+  return resp;
+}
+
+function desfazerUltimaDespesa(){
+  if(state.despesas.length === 0){
+    return "Não há nenhuma despesa registrada pra desfazer.";
+  }
+  const ultima = state.despesas[state.despesas.length - 1];
+  state.despesas.pop();
+  if(state.usuario.saldo_disponivel !== null){
+    state.usuario.saldo_disponivel += ultima.valor;
+  }
+  let resp = `↩️ Desfeito: *${fmt(ultima.valor)}* em *${ultima.categoria}* (${ultima.descricao || ''}) foi removido.`;
+  if(state.usuario.saldo_disponivel !== null){
+    resp += `\nSaldo disponível agora: *${fmt(state.usuario.saldo_disponivel)}*`;
+  }
+  if(ultima.exportado){
+    resp += `\n\n⚠️ Essa despesa já tinha sido exportada pra sua planilha — a linha de lá continua existindo, você precisa apagá-la manualmente também.`;
+  }
+  return resp;
+}
+
+function tratarRegistroReceita(textoOriginal, valor){
+  let descricao = textoOriginal
+    .replace(/recebi|ganhei/i, '')
+    .replace(/r\$\s*[\d.,]+/i, '')
+    .replace(/\bde\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if(!descricao) descricao = 'Receita';
+  state.receitas.push({ data: hojeStr(), descricao, valor });
+  if(state.usuario.saldo_disponivel !== null){
+    state.usuario.saldo_disponivel += valor;
+  }
+  let resp = `💵 Receita registrada: *${fmt(valor)}* (${descricao}).`;
+  if(state.usuario.saldo_disponivel !== null){
+    resp += `\nSaldo disponível agora: *${fmt(state.usuario.saldo_disponivel)}*`;
+  }
+  return resp;
+}
+
+function tratarRegistroInvestimento(textoOriginal, valor){
+  let local = textoOriginal
+    .replace(/investi/i, '')
+    .replace(/r\$\s*[\d.,]+/i, '')
+    .replace(/\bno\b|\bna\b|\bem\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if(!local) local = 'Investimento';
+  state.investimentos.push({ data: hojeStr(), local, valor });
+  let resp = `📈 Investido *${fmt(valor)}* em *${local}*.`;
+  if(state.usuario.saldo_disponivel !== null){
+    resp += `\n(Isso não é descontado do seu saldo automaticamente — se o dinheiro saiu da conta, registre também como despesa, se quiser manter o saldo exato.)`;
+  }
+  return resp;
+}
+
+function tratarCadastroMeta(textoOriginal){
+  const valor = extrairValor(textoOriginal);
+  if(valor === null){
+    return 'Pra criar uma meta, me diga o nome e o valor. Ex: "Nova meta: viagem R$5000".';
+  }
+  let nome = textoOriginal
+    .replace(/nova meta:?/i, '')
+    .replace(/minha meta [ée]/i, '')
+    .replace(/r\$\s*[\d.,]+/i, '')
+    .replace(/\bjuntar\b|\bpara\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if(!nome) nome = `Meta ${state.metas.length + 1}`;
+  state.metas.push({ nome, valorMeta: valor, depositos: [] });
+  return `🎯 Meta criada: *${nome}* — objetivo de ${fmt(valor)}. Pra guardar dinheiro nela, diga por exemplo: "Guardei R$100 na meta ${nome}".`;
+}
+
+function tratarDepositoMeta(textoOriginal, valor){
+  const t = textoOriginal.toLowerCase();
+  const meta = state.metas.find(m => t.includes(m.nome.toLowerCase()));
+  if(!meta){
+    if(state.metas.length === 0){
+      return 'Você ainda não tem nenhuma meta cadastrada. Crie uma primeiro: "Nova meta: viagem R$5000".';
+    }
+    return `Não identifiquei a qual meta isso se refere. Suas metas atuais: ${state.metas.map(m => m.nome).join(', ')}.`;
+  }
+  meta.depositos.push({ data: hojeStr(), texto: textoOriginal, valor });
+  const guardado = meta.depositos.reduce((s, d) => s + d.valor, 0);
+  const resta = meta.valorMeta - guardado;
+  let resp = `🎯 Guardado *${fmt(valor)}* para a meta *${meta.nome}*.\nTotal guardado: ${fmt(guardado)} de ${fmt(meta.valorMeta)}`;
+  resp += resta > 0 ? ` (falta ${fmt(resta)}).` : ' — meta atingida! 🎉';
+  return resp;
+}
+
+function tratarAjuda(){
+  return `Aqui estão os formatos de frase que eu reconheço (sem IA, então a frase precisa ser parecida com isso):\n\n• *Registrar despesa*: "Gastei R$50 no mercado" ou "Paguei R$30 de uber no pix"\n• *Registrar com data diferente de hoje*: "Gastei R$50 no mercado ontem", "anteontem", "dia 10" ou "10/08"\n• *Desfazer o último gasto*: "desfazer último gasto" ou "apagar último gasto"\n• *Consultar saldo*: "saldo"\n• *Cadastrar conta fixa*: "Meu aluguel é R$1200 todo dia 5"\n• *Avaliar compra*: "Posso comprar um notebook de R$3000 em 12x?"\n• *Relatório*: "relatório" (hoje) ou "relatório de ontem", "relatório do dia 10", "relatório de 10/08"\n• *Registrar receita*: "Recebi R$3000 de freelancer"\n• *Registrar investimento*: "Investi R$300 no Tesouro Direto"\n• *Criar meta*: "Nova meta: viagem R$5000"\n• *Guardar para uma meta*: "Guardei R$100 na meta viagem"\n\nTambém dá pra usar os botões de atalho abaixo — o 🧾 Despesas mostra tudo que já foi lançado, com opção de remover qualquer uma, não só a última. Contas/configurações ficam nos ícones ⚙️ 📋 👥 no topo.`;
+}
+
+function tratarConsultaViabilidade(textoOriginal){
+  const valor = extrairValor(textoOriginal);
+  if(valor===null){
+    return "Para avaliar a compra, me diga o valor. Ex: \"Posso comprar um notebook de R$3000 em 12x?\"";
+  }
+  if(state.usuario.renda_mensal === null || state.usuario.saldo_disponivel === null){
+    return "Antes de avaliar isso, preciso da sua renda mensal e saldo disponível. Configure em ⚙️.";
+  }
+  const parcelasMatch = textoOriginal.match(/(\d{1,2})\s*x\b/i) || textoOriginal.match(/(\d{1,2})\s*vezes/i);
+  const parcelas = parcelasMatch ? parseInt(parcelasMatch[1]) : 1;
+  const parcelaMensal = valor / parcelas;
+  const contasFixasMensais = state.contas_a_pagar.filter(c=>c.recorrente).reduce((s,c)=>s+c.valor,0);
+  const comprometimento = ((parcelas>1 ? parcelaMensal : 0) + contasFixasMensais) / state.usuario.renda_mensal * 100;
+  const saldoApos = parcelas===1 ? state.usuario.saldo_disponivel - valor : state.usuario.saldo_disponivel - parcelaMensal;
+  const proximas = contasProximas(30);
+  const totalProximas = proximas.reduce((s,c)=>s+c.valor,0);
+
+  let veredito, risco;
+  if(comprometimento < 15 && saldoApos > 0){
+    veredito = "Essa compra parece *viável*.";
+    risco = "Não identifiquei um risco imediato relevante com os dados que tenho.";
+  } else if(comprometimento < 30 && saldoApos > 0){
+    veredito = "Essa compra é *viável com atenção*.";
+    risco = "O comprometimento da sua renda fica em uma faixa moderada — vale acompanhar de perto no mês seguinte.";
+  } else {
+    veredito = "Essa compra parece *arriscada* no momento.";
+    risco = saldoApos <= 0
+      ? "O impacto imediato deixaria seu saldo negativo ou muito próximo disso."
+      : "O comprometimento da sua renda ficaria alto, considerando também suas contas fixas.";
+  }
+
+  let resp = `${veredito}\n\n`;
+  resp += `• Compra: ${fmt(valor)} em ${parcelas}x de ${fmt(parcelaMensal)}\n`;
+  resp += `• Comprometimento estimado da renda: ${comprometimento.toFixed(1)}%\n`;
+  resp += `• Saldo estimado após o impacto imediato: ${fmt(saldoApos)}\n`;
+  if(proximas.length>0){
+    resp += `• Contas a vencer nos próximos 30 dias: ${proximas.length} (${fmt(totalProximas)})\n`;
+  }
+  resp += `\n${risco}\n\n_Análise informativa baseada em regras simples e nos dados que você cadastrou — não substitui uma consultoria financeira formal._`;
+  return resp;
+}
+
+// ---------- Exportação para a planilha do usuário (SheetJS, tudo no navegador) ----------
+const MESES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const LINHA_INICIAL_GASTOS = 31;
+const LINHA_FINAL_GASTOS = 103;
+
+function contarPendentesExportar(){
+  return state.despesas.filter(d => !d.exportado).length;
+}
+
+function atualizarBadgeExportar(){
+  const chip = document.getElementById('chipExportar');
+  if(!chip) return;
+  const pendentes = contarPendentesExportar();
+  chip.textContent = pendentes > 0 ? `📊 Exportar (${pendentes})` : '📊 Exportar p/ planilha';
+}
+
+async function processarUploadPlanilha(event){
+  const file = event.target.files[0];
+  event.target.value = '';
+  if(!file) return;
+
+  const pendentes = state.despesas.filter(d => !d.exportado);
+  if(pendentes.length === 0){
+    state.mensagens.push(msgBot("Não há despesas novas para exportar — todas as que você registrou já foram enviadas pra planilha anteriormente."));
+    render();
+    return;
+  }
+
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+
+    const porMes = {};
+    pendentes.forEach(d => {
+      const dt = new Date(d.data + 'T00:00:00');
+      const sheetName = MESES_ABREV[dt.getMonth()];
+      (porMes[sheetName] = porMes[sheetName] || []).push({ despesa: d, data: dt });
+    });
+
+    let algumaAbaEncontrada = false;
+    let algumaAbaCheia = false;
+    let totalInserido = 0;
+
+    for(const [sheetName, itens] of Object.entries(porMes)){
+      const ws = wb.Sheets[sheetName];
+      if(!ws) continue;
+      algumaAbaEncontrada = true;
+
+      let linha = LINHA_INICIAL_GASTOS;
+      while(linha <= LINHA_FINAL_GASTOS && ws['K'+linha] && ws['K'+linha].v){ linha++; }
+
+      for(const item of itens){
+        if(linha > LINHA_FINAL_GASTOS){ algumaAbaCheia = true; break; }
+        ws['K'+linha] = { t: 's', v: item.despesa.categoria || 'Outros' };
+        ws['L'+linha] = { t: 's', v: item.despesa.descricao || '' };
+        ws['M'+linha] = { t: 'd', v: item.data, z: 'dd/mm/yyyy' };
+        ws['N'+linha] = { t: 'n', v: 1 };
+        ws['O'+linha] = { t: 's', v: item.despesa.meio_pagamento || '' };
+        ws['P'+linha] = { t: 'n', v: item.despesa.valor };
+        item.despesa.exportado = true;
+        totalInserido++;
+        linha++;
+      }
+
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      if(range.e.r < linha - 1){
+        range.e.r = linha - 1;
+        ws['!ref'] = XLSX.utils.encode_range(range);
+      }
+    }
+
+    if(!algumaAbaEncontrada){
+      state.mensagens.push(msgBot("⚠️ Não encontrei nenhuma aba de mês (Jan, Fev, Mar...) nesse arquivo. Confirma que subiu a planilha certa?"));
+      render();
+      return;
+    }
+
+    salvarEstado();
+
+    const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name.replace(/\.xlsx$/i, '') + '_atualizada.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    let resp = `✅ Exportei *${totalInserido}* despesa(s) para sua planilha, direto na tabela "Gastos do dia a dia (variáveis)" do(s) mês(es) correspondente(s).\n\nO arquivo atualizado foi baixado — substitua o antigo por ele, ou continue usando esse a partir de agora.`;
+    if(algumaAbaCheia){
+      resp += `\n\n⚠️ A tabela de algum mês já estava cheia (linha ${LINHA_FINAL_GASTOS}) e alguns lançamentos não couberam. Pode ser hora de revisar/limpar a planilha desse mês.`;
+    }
+    state.mensagens.push(msgBot(resp));
+    render();
+  }catch(e){
+    state.mensagens.push(msgBot("⚠️ Não consegui processar essa planilha (" + e.message + "). Confirma que é o arquivo .xlsx certo e que ele não está protegido/bloqueado para edição."));
+    render();
+  }
+}
+
+// ---------- Integração direta com o Google Sheets (sem servidor, OAuth no navegador) ----------
+// Substitua pelo Client ID gerado no Google Cloud Console (veja instruções no README).
+const GOOGLE_CLIENT_ID = '905544159367-abd4eik2c512554qcmplrnppnq9ojc2g.apps.googleusercontent.com';
+
+let googleAccessToken = null;
+let googleTokenClient = null;
+
+function initGoogleClient(){
+  if(googleTokenClient) return true;
+  if(!window.google || !window.google.accounts || !window.google.accounts.oauth2) return false;
+  googleTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/spreadsheets',
+    callback: (resp) => {
+      if(resp.error){
+        state.mensagens.push(msgBot("⚠️ Não consegui autorizar o acesso ao Google Sheets (" + resp.error + "). Confirme se o Client ID está configurado corretamente."));
+      } else {
+        googleAccessToken = resp.access_token;
+        state.mensagens.push(msgBot("✅ Conectado ao Google Sheets! Agora toque em \"📤 Exportar tudo\" sempre que quiser."));
+      }
+      render();
+    }
+  });
+  return true;
+}
+
+function conectarGoogleSheets(){
+  if(GOOGLE_CLIENT_ID.includes('COLOQUE_SEU_CLIENT_ID_AQUI')){
+    alert('Ainda falta configurar o Client ID do Google neste site. Veja o passo a passo que te mandei para criar o seu.');
+    return;
+  }
+  const ok = initGoogleClient();
+  if(!ok){
+    alert('A biblioteca do Google ainda está carregando. Aguarde alguns segundos e tente de novo.');
+    return;
+  }
+  googleTokenClient.requestAccessToken();
+}
+
+function extrairSheetId(input){
+  const m = input.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : input.trim();
+}
+
+function salvarSheetId(){
+  const raw = document.getElementById('cfgSheetId').value.trim();
+  if(!raw){ alert('Cole o link ou ID da sua planilha.'); return; }
+  state.usuario.google_sheet_id = extrairSheetId(raw);
+  salvarEstado();
+  atualizarStatusGoogle();
+  alert('ID da planilha salvo!');
+}
+
+function atualizarStatusGoogle(){
+  const el = document.getElementById('statusGoogle');
+  if(!el) return;
+  const partes = [];
+  partes.push(state.usuario.google_sheet_id ? '✅ Planilha configurada' : '⬜ Planilha ainda não configurada');
+  partes.push(googleAccessToken ? '✅ Conectado nesta sessão' : '⬜ Ainda não conectado nesta sessão');
+  el.innerHTML = partes.join('<br>');
+  if(state.usuario.google_sheet_id){
+    document.getElementById('cfgSheetId').value = state.usuario.google_sheet_id;
+  }
+}
+
+function formatarDataBR(date){
+  const d = String(date.getDate()).padStart(2,'0');
+  const m = String(date.getMonth()+1).padStart(2,'0');
+  const y = date.getFullYear();
+  return `${d}/${m}/${y}`;
+}
+
+async function exportarDespesasParaGoogleSheets(sheetId){
+  const pendentes = state.despesas.filter(d => !d.exportado);
+  if(pendentes.length === 0) return { totalInserido: 0, erros: [] };
+
+  const porMes = {};
+  pendentes.forEach(d => {
+    const dt = new Date(d.data + 'T00:00:00');
+    const nome = MESES_ABREV[dt.getMonth()];
+    (porMes[nome] = porMes[nome] || []).push({ despesa: d, data: dt });
+  });
+
+  let totalInserido = 0;
+  let erros = [];
+
+  for(const [sheetName, itens] of Object.entries(porMes)){
+    try{
+      const rangeLeitura = `${sheetName}!K${LINHA_INICIAL_GASTOS}:K${LINHA_FINAL_GASTOS}`;
+      const getResp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeLeitura)}`,
+        { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+      );
+      if(!getResp.ok) throw new Error(`Falha ao ler a aba "${sheetName}" (HTTP ${getResp.status})`);
+      const getData = await getResp.json();
+      const linhasExistentes = (getData.values || []).length;
+      let linha = LINHA_INICIAL_GASTOS + linhasExistentes;
+
+      const itensQueCabem = [];
+      for(const item of itens){
+        if(linha + itensQueCabem.length > LINHA_FINAL_GASTOS) break;
+        itensQueCabem.push(item);
+      }
+      if(itensQueCabem.length === 0){
+        erros.push(`A tabela de despesas do mês "${sheetName}" já está cheia.`);
+        continue;
+      }
+
+      const valores = itensQueCabem.map(item => [
+        item.despesa.categoria || 'Outros',
+        item.despesa.descricao || '',
+        formatarDataBR(item.data),
+        1,
+        item.despesa.meio_pagamento || '',
+        item.despesa.valor
+      ]);
+
+      const rangeEscrita = `${sheetName}!K${linha}:P${linha + valores.length - 1}`;
+      const putResp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeEscrita)}?valueInputOption=USER_ENTERED`,
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${googleAccessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ range: rangeEscrita, values: valores })
+        }
+      );
+      if(!putResp.ok) throw new Error(`Falha ao escrever na aba "${sheetName}" (HTTP ${putResp.status})`);
+
+      itensQueCabem.forEach(item => { item.despesa.exportado = true; });
+      totalInserido += itensQueCabem.length;
+    }catch(e){
+      erros.push(e.message);
+    }
+  }
+  return { totalInserido, erros };
+}
+
+const LINHA_INICIAL_RECEITAS = 5;
+const LINHA_FINAL_RECEITAS = 15;
+const LINHA_INICIAL_INVEST = 20;
+const LINHA_FINAL_INVEST = 24;
+
+async function exportarReceitasParaGoogleSheets(sheetId){
+  const pendentes = state.receitas.filter(r => !r.exportado);
+  if(pendentes.length === 0) return { totalInserido: 0, erros: [] };
+
+  const porMes = {};
+  pendentes.forEach(r => {
+    const dt = new Date(r.data + 'T00:00:00');
+    const nome = MESES_ABREV[dt.getMonth()];
+    (porMes[nome] = porMes[nome] || []).push({ item: r, data: dt });
+  });
+
+  let totalInserido = 0;
+  let erros = [];
+
+  for(const [sheetName, itens] of Object.entries(porMes)){
+    try{
+      const rangeLeitura = `${sheetName}!G${LINHA_INICIAL_RECEITAS}:G${LINHA_FINAL_RECEITAS}`;
+      const getResp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeLeitura)}`,
+        { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+      );
+      if(!getResp.ok) throw new Error(`Falha ao ler receitas da aba "${sheetName}" (HTTP ${getResp.status})`);
+      const getData = await getResp.json();
+      const linhasExistentes = (getData.values || []).length;
+      let linha = LINHA_INICIAL_RECEITAS + linhasExistentes;
+
+      const itensQueCabem = [];
+      for(const item of itens){
+        if(linha + itensQueCabem.length > LINHA_FINAL_RECEITAS) break;
+        itensQueCabem.push(item);
+      }
+      if(itensQueCabem.length === 0){
+        erros.push(`A tabela de receitas do mês "${sheetName}" já está cheia.`);
+        continue;
+      }
+
+      const valores = itensQueCabem.map(item => [
+        formatarDataBR(item.data),
+        item.item.descricao || '',
+        item.item.valor
+      ]);
+
+      const rangeEscrita = `${sheetName}!G${linha}:I${linha + valores.length - 1}`;
+      const putResp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeEscrita)}?valueInputOption=USER_ENTERED`,
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${googleAccessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ range: rangeEscrita, values: valores })
+        }
+      );
+      if(!putResp.ok) throw new Error(`Falha ao escrever receitas na aba "${sheetName}" (HTTP ${putResp.status})`);
+
+      itensQueCabem.forEach(item => { item.item.exportado = true; });
+      totalInserido += itensQueCabem.length;
+    }catch(e){
+      erros.push(e.message);
+    }
+  }
+  return { totalInserido, erros };
+}
+
+async function exportarInvestimentosParaGoogleSheets(sheetId){
+  const pendentes = state.investimentos.filter(v => !v.exportado);
+  if(pendentes.length === 0) return { totalInserido: 0, erros: [] };
+
+  const porMes = {};
+  pendentes.forEach(v => {
+    const dt = new Date(v.data + 'T00:00:00');
+    const nome = MESES_ABREV[dt.getMonth()];
+    (porMes[nome] = porMes[nome] || []).push({ item: v, data: dt });
+  });
+
+  let totalInserido = 0;
+  let erros = [];
+
+  for(const [sheetName, itens] of Object.entries(porMes)){
+    try{
+      const rangeLeitura = `${sheetName}!G${LINHA_INICIAL_INVEST}:G${LINHA_FINAL_INVEST}`;
+      const getResp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeLeitura)}`,
+        { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+      );
+      if(!getResp.ok) throw new Error(`Falha ao ler investimentos da aba "${sheetName}" (HTTP ${getResp.status})`);
+      const getData = await getResp.json();
+      const linhasExistentes = (getData.values || []).length;
+      let linha = LINHA_INICIAL_INVEST + linhasExistentes;
+
+      const itensQueCabem = [];
+      for(const item of itens){
+        if(linha + itensQueCabem.length > LINHA_FINAL_INVEST) break;
+        itensQueCabem.push(item);
+      }
+      if(itensQueCabem.length === 0){
+        erros.push(`A tabela de investimentos do mês "${sheetName}" já está cheia (limite de 5 por mês).`);
+        continue;
+      }
+
+      const valores = itensQueCabem.map(item => [
+        item.item.local || '',
+        '',
+        item.item.valor
+      ]);
+
+      const rangeEscrita = `${sheetName}!G${linha}:I${linha + valores.length - 1}`;
+      const putResp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeEscrita)}?valueInputOption=USER_ENTERED`,
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${googleAccessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ range: rangeEscrita, values: valores })
+        }
+      );
+      if(!putResp.ok) throw new Error(`Falha ao escrever investimentos na aba "${sheetName}" (HTTP ${putResp.status})`);
+
+      itensQueCabem.forEach(item => { item.item.exportado = true; });
+      totalInserido += itensQueCabem.length;
+    }catch(e){
+      erros.push(e.message);
+    }
+  }
+  return { totalInserido, erros };
+}
+
+const METAS_SLOTS = [
+  { nome: 'B', valor: 'C' },
+  { nome: 'E', valor: 'F' },
+  { nome: 'H', valor: 'I' },
+  { nome: 'K', valor: 'L' }
+];
+const METAS_LINHA_INICIAL = 11;
+const METAS_LINHA_FINAL = 24;
+
+async function exportarMetasParaGoogleSheets(sheetId){
+  let totalInserido = 0;
+  let erros = [];
+
+  for(const meta of state.metas){
+    const pendentes = meta.depositos.filter(d => !d.exportado);
+    if(pendentes.length === 0) continue;
+
+    try{
+      let slotEscolhido = null;
+      let slotVazio = null;
+      for(const slot of METAS_SLOTS){
+        const cellRange = `Metas!${slot.nome}5`;
+        const resp = await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(cellRange)}`,
+          { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+        );
+        if(!resp.ok) throw new Error(`Falha ao ler os slots da aba "Metas" (HTTP ${resp.status})`);
+        const data = await resp.json();
+        const nomeCelula = ((data.values && data.values[0] && data.values[0][0]) || '').toString().trim().toLowerCase();
+        if(nomeCelula === meta.nome.trim().toLowerCase()){
+          slotEscolhido = slot;
+          break;
+        }
+        if(!slotVazio && (nomeCelula === '' || nomeCelula.includes('insira o nome'))){
+          slotVazio = slot;
+        }
+      }
+      const eraSlotNovo = !slotEscolhido && !!slotVazio;
+      if(!slotEscolhido) slotEscolhido = slotVazio;
+      if(!slotEscolhido){
+        erros.push(`Não há espaço na aba "Metas" para a meta "${meta.nome}" (limite de 4 metas simultâneas na planilha).`);
+        continue;
+      }
+
+      if(eraSlotNovo){
+        await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent('Metas!'+slotEscolhido.nome+'5')}?valueInputOption=USER_ENTERED`,
+          { method:'PUT', headers:{ Authorization:`Bearer ${googleAccessToken}`, 'Content-Type':'application/json' },
+            body: JSON.stringify({ range: 'Metas!'+slotEscolhido.nome+'5', values: [[meta.nome]] }) }
+        );
+        await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent('Metas!'+slotEscolhido.valor+'6')}?valueInputOption=USER_ENTERED`,
+          { method:'PUT', headers:{ Authorization:`Bearer ${googleAccessToken}`, 'Content-Type':'application/json' },
+            body: JSON.stringify({ range: 'Metas!'+slotEscolhido.valor+'6', values: [[meta.valorMeta]] }) }
+        );
+      }
+
+      const rangeLeituraDepositos = `Metas!${slotEscolhido.valor}${METAS_LINHA_INICIAL}:${slotEscolhido.valor}${METAS_LINHA_FINAL}`;
+      const getResp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeLeituraDepositos)}`,
+        { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+      );
+      if(!getResp.ok) throw new Error(`Falha ao ler depósitos da meta "${meta.nome}" (HTTP ${getResp.status})`);
+      const getData = await getResp.json();
+      const linhasExistentes = (getData.values || []).filter(l => l[0] !== undefined && l[0] !== '').length;
+      let linha = METAS_LINHA_INICIAL + linhasExistentes;
+
+      const depositosQueCabem = [];
+      for(const dep of pendentes){
+        if(linha + depositosQueCabem.length > METAS_LINHA_FINAL) break;
+        depositosQueCabem.push(dep);
+      }
+      if(depositosQueCabem.length === 0){
+        erros.push(`O histórico de depósitos da meta "${meta.nome}" já está cheio.`);
+        continue;
+      }
+
+      const valoresLinha = depositosQueCabem.map(dep => [
+        `${dep.texto || 'Depósito'} - ${formatarDataBR(new Date(dep.data + 'T00:00:00'))}`,
+        dep.valor
+      ]);
+      const rangeEscritaDepositos = `Metas!${slotEscolhido.nome}${linha}:${slotEscolhido.valor}${linha + valoresLinha.length - 1}`;
+      const putResp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeEscritaDepositos)}?valueInputOption=USER_ENTERED`,
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${googleAccessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ range: rangeEscritaDepositos, values: valoresLinha })
+        }
+      );
+      if(!putResp.ok) throw new Error(`Falha ao escrever depósitos da meta "${meta.nome}" (HTTP ${putResp.status})`);
+
+      depositosQueCabem.forEach(dep => { dep.exportado = true; });
+      totalInserido += depositosQueCabem.length;
+    }catch(e){
+      erros.push(e.message);
+    }
+  }
+  return { totalInserido, erros };
+}
+
+async function exportarParaGoogleSheets(){
+  if(!state.usuario.google_sheet_id){
+    state.mensagens.push(msgBot("Configure o ID da sua planilha do Google (ícone 🔗) antes de exportar."));
+    render();
+    return;
+  }
+  if(!googleAccessToken){
+    state.mensagens.push(msgBot('Primeiro toque em "🔐 Conectar Google Sheets" (ícone 🔗) para autorizar o acesso.'));
+    render();
+    return;
+  }
+
+  const sheetId = state.usuario.google_sheet_id;
+  const resDespesas = await exportarDespesasParaGoogleSheets(sheetId);
+  const resReceitas = await exportarReceitasParaGoogleSheets(sheetId);
+  const resInvest = await exportarInvestimentosParaGoogleSheets(sheetId);
+  const resMetas = await exportarMetasParaGoogleSheets(sheetId);
+
+  salvarEstado();
+
+  const partes = [];
+  if(resDespesas.totalInserido > 0) partes.push(`${resDespesas.totalInserido} despesa(s)`);
+  if(resReceitas.totalInserido > 0) partes.push(`${resReceitas.totalInserido} receita(s)`);
+  if(resInvest.totalInserido > 0) partes.push(`${resInvest.totalInserido} investimento(s)`);
+  if(resMetas.totalInserido > 0) partes.push(`${resMetas.totalInserido} depósito(s) de meta`);
+
+  let resp = partes.length > 0
+    ? `✅ Exportado pra sua planilha: ${partes.join(', ')}.`
+    : "Não havia nada novo pra exportar (despesas, receitas, investimentos ou metas).";
+
+  const todosErros = [...resDespesas.erros, ...resReceitas.erros, ...resInvest.erros, ...resMetas.erros];
+  if(todosErros.length > 0){
+    resp += `\n\n⚠️ ${todosErros.join(' ')}`;
+  }
+  state.mensagens.push(msgBot(resp));
+  render();
+}
+
+function converterDataBRparaISO(texto){
+  const m = String(texto).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if(!m) return null;
+  const dia = parseInt(m[1]), mes = parseInt(m[2]);
+  let ano = parseInt(m[3]);
+  if(ano < 100) ano += 2000;
+  if(dia < 1 || dia > 31 || mes < 1 || mes > 12) return null;
+  return `${ano}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+}
+
+async function importarDeGoogleSheets(){
+  if(!state.usuario.google_sheet_id){
+    state.mensagens.push(msgBot("Configure o ID da sua planilha do Google (ícone 🔗) antes de importar."));
+    render();
+    return;
+  }
+  if(!googleAccessToken){
+    state.mensagens.push(msgBot('Primeiro toque em "🔐 Conectar Google Sheets" para autorizar o acesso.'));
+    render();
+    return;
+  }
+  const confirmado = confirm(
+    "Isso vai SUBSTITUIR as despesas, receitas, investimentos e metas salvos neste aparelho pelos que estiverem na sua planilha.\n\n" +
+    "Sua renda, saldo disponível e contas a pagar NÃO são recuperados por essa importação — você vai precisar reconfigurar isso manualmente depois (⚙️ e 📋).\n\n" +
+    "Continuar?"
+  );
+  if(!confirmado) return;
+
+  const sheetId = state.usuario.google_sheet_id;
+  const despesasImportadas = [];
+  const receitasImportadas = [];
+  const investimentosImportados = [];
+  const errosAbas = [];
+
+  for(const sheetName of MESES_ABREV){
+    try{
+      const range = `${sheetName}!K${LINHA_INICIAL_GASTOS}:P${LINHA_FINAL_GASTOS}`;
+      const resp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}`,
+        { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+      );
+      if(!resp.ok){ errosAbas.push(sheetName); continue; }
+      const data = await resp.json();
+      const linhas = data.values || [];
+      for(const linha of linhas){
+        const [categoria, descricao, dataTexto, , pagamento, valorTexto] = linha;
+        if(!dataTexto || valorTexto === undefined || valorTexto === '') continue;
+        const dataISO = converterDataBRparaISO(dataTexto);
+        const valorLimpo = String(valorTexto).replace(/\./g,'').replace(',', '.');
+        const valor = parseFloat(valorLimpo);
+        if(!dataISO || isNaN(valor)) continue;
+        despesasImportadas.push({
+          valor,
+          categoria: categoria || 'Outros',
+          descricao: descricao || '',
+          meio_pagamento: pagamento || null,
+          data: dataISO,
+          exportado: true
+        });
+      }
+    }catch(e){
+      errosAbas.push(sheetName);
+    }
+
+    try{
+      const rangeReceitas = `${sheetName}!G${LINHA_INICIAL_RECEITAS}:I${LINHA_FINAL_RECEITAS}`;
+      const resp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeReceitas)}`,
+        { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+      );
+      if(resp.ok){
+        const data = await resp.json();
+        for(const linha of (data.values || [])){
+          const [dataTexto, descricao, valorTexto] = linha;
+          if(!dataTexto || valorTexto === undefined || valorTexto === '') continue;
+          const dataISO = converterDataBRparaISO(dataTexto);
+          const valor = parseFloat(String(valorTexto).replace(/\./g,'').replace(',', '.'));
+          if(!dataISO || isNaN(valor)) continue;
+          receitasImportadas.push({ data: dataISO, descricao: descricao || '', valor, exportado: true });
+        }
+      }
+    }catch(e){ /* aba de receitas sem dados ou inacessível - ignora */ }
+
+    try{
+      const rangeInvest = `${sheetName}!G${LINHA_INICIAL_INVEST}:I${LINHA_FINAL_INVEST}`;
+      const resp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(rangeInvest)}`,
+        { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+      );
+      if(resp.ok){
+        const data = await resp.json();
+        for(const linha of (data.values || [])){
+          const local = linha[0];
+          const valorTexto = linha[2];
+          if(!local || valorTexto === undefined || valorTexto === '') continue;
+          const valor = parseFloat(String(valorTexto).replace(/\./g,'').replace(',', '.'));
+          if(isNaN(valor)) continue;
+          investimentosImportados.push({ data: sheetNameParaDataAprox(sheetName), local, valor, exportado: true });
+        }
+      }
+    }catch(e){ /* aba de investimentos sem dados ou inacessível - ignora */ }
+  }
+
+  const metasImportadas = [];
+  for(const slot of METAS_SLOTS){
+    try{
+      const nomeResp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent('Metas!'+slot.nome+'5')}`,
+        { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+      );
+      const nomeData = await nomeResp.json();
+      const nome = ((nomeData.values && nomeData.values[0] && nomeData.values[0][0]) || '').toString().trim();
+      if(!nome || nome.toLowerCase().includes('insira o nome')) continue;
+
+      const valorMetaResp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent('Metas!'+slot.valor+'6')}`,
+        { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+      );
+      const valorMetaData = await valorMetaResp.json();
+      const valorMetaTexto = (valorMetaData.values && valorMetaData.values[0] && valorMetaData.values[0][0]);
+      const valorMeta = parseFloat(String(valorMetaTexto || 0).replace(/\./g,'').replace(',', '.')) || 0;
+
+      const depositosResp = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent('Metas!'+slot.nome+METAS_LINHA_INICIAL+':'+slot.valor+METAS_LINHA_FINAL)}`,
+        { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+      );
+      const depositosData = await depositosResp.json();
+      const depositos = [];
+      for(const linha of (depositosData.values || [])){
+        const texto = linha[0];
+        const valorTexto = linha[1];
+        if(!texto || valorTexto === undefined || valorTexto === '') continue;
+        const valor = parseFloat(String(valorTexto).replace(/\./g,'').replace(',', '.'));
+        if(isNaN(valor)) continue;
+        depositos.push({ data: hojeStr(), texto, valor, exportado: true });
+      }
+      metasImportadas.push({ nome, valorMeta, depositos });
+    }catch(e){ /* slot de meta sem dados ou inacessível - ignora */ }
+  }
+
+  state.despesas = despesasImportadas;
+  state.receitas = receitasImportadas;
+  state.investimentos = investimentosImportados;
+  state.metas = metasImportadas;
+  salvarEstado();
+  render();
+
+  const partesImportadas = [];
+  if(despesasImportadas.length > 0) partesImportadas.push(`${despesasImportadas.length} despesa(s)`);
+  if(receitasImportadas.length > 0) partesImportadas.push(`${receitasImportadas.length} receita(s)`);
+  if(investimentosImportados.length > 0) partesImportadas.push(`${investimentosImportados.length} investimento(s)`);
+  if(metasImportadas.length > 0) partesImportadas.push(`${metasImportadas.length} meta(s)`);
+
+  let resp = `📥 Importei da sua planilha: ${partesImportadas.length > 0 ? partesImportadas.join(', ') : 'nada encontrado'}.\n\n⚠️ Não esqueça de reconfigurar sua renda mensal e saldo disponível (⚙️), e recadastrar suas contas fixas (📋) — essas informações não ficam salvas na planilha.`;
+  if(errosAbas.length > 0){
+    resp += `\n\nAlgumas abas não puderam ser lidas: ${errosAbas.join(', ')}.`;
+  }
+  state.mensagens.push(msgBot(resp));
+  render();
+}
+
+function sheetNameParaDataAprox(sheetName){
+  const idx = MESES_ABREV.indexOf(sheetName);
+  const ano = new Date().getFullYear();
+  const mes = String(idx + 1).padStart(2, '0');
+  return `${ano}-${mes}-01`;
+}
+
+// ---------- Modais ----------
+function abrirModal(tipo){
+  fecharModal();
+  if(tipo==='despesas') document.getElementById('modalDespesas').classList.add('open');
+  if(tipo==='contas') document.getElementById('modalContas').classList.add('open');
+  if(tipo==='receitas') document.getElementById('modalReceitas').classList.add('open');
+  if(tipo==='investimentos') document.getElementById('modalInvestimentos').classList.add('open');
+  if(tipo==='metas') document.getElementById('modalMetas').classList.add('open');
+  if(tipo==='compartilhar') document.getElementById('modalCompartilhar').classList.add('open');
+  if(tipo==='google'){
+    document.getElementById('modalGoogle').classList.add('open');
+    atualizarStatusGoogle();
+  }
+  if(tipo==='config'){
+    document.getElementById('cfgRenda').value = state.usuario.renda_mensal ?? '';
+    document.getElementById('cfgSaldo').value = state.usuario.saldo_disponivel ?? '';
+    document.getElementById('modalConfig').classList.add('open');
+  }
+  renderModalLists();
+}
+function fecharModal(){
+  document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));
+}
+function renderModalLists(){
+  const ld = document.getElementById('listaDespesas');
+  if(ld){
+    if(state.despesas.length === 0){
+      ld.innerHTML = '<p style="color:#888;">Nenhuma despesa registrada ainda.</p>';
+    } else {
+      const comIndice = state.despesas.map((d, i) => ({ d, i }));
+      comIndice.sort((a, b) => (b.d.data + b.i.toString().padStart(6,'0')).localeCompare(a.d.data + a.i.toString().padStart(6,'0')));
+      ld.innerHTML = comIndice.slice(0, 50).map(({d, i}) => {
+        const dataExibicao = formatarDataBR(new Date(d.data + 'T00:00:00'));
+        const tagExportado = d.exportado ? ' <span class="perm">(já exportada)</span>' : '';
+        return `<div class="share-item"><span>${dataExibicao} — ${d.categoria}: ${fmt(d.valor)}<br><span class="perm">${d.descricao || ''}${d.meio_pagamento ? ' • ' + d.meio_pagamento : ''}</span>${tagExportado}</span><span class="share-remove" onclick="removerDespesa(${i})">remover</span></div>`;
+      }).join('');
+    }
+  }
+
+  const lc = document.getElementById('listaContas');
+  if(lc){
+    lc.innerHTML = state.contas_a_pagar.length===0
+      ? '<p style="color:#888;">Nenhuma conta cadastrada ainda.</p>'
+      : state.contas_a_pagar.map((c,i)=>`<div class="share-item"><span>${c.descricao} — ${fmt(c.valor)}<br><span class="perm">dia ${c.dia_vencimento}</span></span><span class="share-remove" onclick="removerConta(${i})">remover</span></div>`).join('');
+  }
+
+  const lr = document.getElementById('listaReceitas');
+  if(lr){
+    lr.innerHTML = state.receitas.length===0
+      ? '<p style="color:#888;">Nenhuma receita registrada ainda.</p>'
+      : state.receitas.slice().reverse().map((r) => {
+          const i = state.receitas.indexOf(r);
+          const dataExibicao = formatarDataBR(new Date(r.data + 'T00:00:00'));
+          const tag = r.exportado ? ' <span class="perm">(já exportada)</span>' : '';
+          return `<div class="share-item"><span>${dataExibicao} — ${fmt(r.valor)}<br><span class="perm">${r.descricao}</span>${tag}</span><span class="share-remove" onclick="removerReceita(${i})">remover</span></div>`;
+        }).join('');
+  }
+
+  const li = document.getElementById('listaInvestimentos');
+  if(li){
+    li.innerHTML = state.investimentos.length===0
+      ? '<p style="color:#888;">Nenhum investimento registrado ainda.</p>'
+      : state.investimentos.slice().reverse().map((v) => {
+          const i = state.investimentos.indexOf(v);
+          const dataExibicao = formatarDataBR(new Date(v.data + 'T00:00:00'));
+          const tag = v.exportado ? ' <span class="perm">(já exportado)</span>' : '';
+          return `<div class="share-item"><span>${dataExibicao} — ${fmt(v.valor)}<br><span class="perm">${v.local}</span>${tag}</span><span class="share-remove" onclick="removerInvestimento(${i})">remover</span></div>`;
+        }).join('');
+  }
+
+  const lm = document.getElementById('listaMetas');
+  if(lm){
+    lm.innerHTML = state.metas.length===0
+      ? '<p style="color:#888;">Nenhuma meta criada ainda.</p>'
+      : state.metas.map((m, i) => {
+          const guardado = m.depositos.reduce((s,d)=>s+d.valor,0);
+          const pct = m.valorMeta > 0 ? Math.min(100, Math.round(guardado / m.valorMeta * 100)) : 0;
+          return `<div class="share-item"><span><b>${m.nome}</b><br><span class="perm">${fmt(guardado)} de ${fmt(m.valorMeta)} (${pct}%)</span></span><span class="share-remove" onclick="removerMeta(${i})">remover</span></div>`;
+        }).join('');
+  }
+
+  const lp = document.getElementById('listaCompartilhados');
+  if(lp){
+    lp.innerHTML = state.compartilhamentos.length===0
+      ? '<p style="color:#888;">Nenhum contato salvo ainda.</p>'
+      : state.compartilhamentos.map((p,i)=>`<div class="share-item"><span>${p.nome}</span><span class="share-remove" onclick="removerCompartilhamento(${i})">remover</span></div>`).join('');
+  }
+}
+
+function adicionarContaManual(){
+  const desc = document.getElementById('contaDesc').value.trim();
+  const valor = parseFloat(document.getElementById('contaValor').value);
+  const dia = parseInt(document.getElementById('contaDia').value);
+  if(!desc || isNaN(valor) || isNaN(dia)){ alert('Preencha todos os campos.'); return; }
+  state.contas_a_pagar.push({descricao:desc, valor, dia_vencimento:dia, recorrente:true});
+  document.getElementById('contaDesc').value='';
+  document.getElementById('contaValor').value='';
+  document.getElementById('contaDia').value='';
+  salvarEstado();
+  render();
+}
+function removerConta(i){
+  state.contas_a_pagar.splice(i,1);
+  salvarEstado();
+  render();
+}
+
+function adicionarReceitaManual(){
+  const desc = document.getElementById('receitaDesc').value.trim();
+  const valor = parseFloat(document.getElementById('receitaValor').value);
+  if(!desc || isNaN(valor)){ alert('Preencha todos os campos.'); return; }
+  state.receitas.push({ data: hojeStr(), descricao: desc, valor });
+  if(state.usuario.saldo_disponivel !== null){ state.usuario.saldo_disponivel += valor; }
+  document.getElementById('receitaDesc').value = '';
+  document.getElementById('receitaValor').value = '';
+  salvarEstado();
+  render();
+}
+function removerReceita(i){
+  const r = state.receitas[i];
+  if(!r) return;
+  if(!confirm(`Remover receita de ${fmt(r.valor)} (${r.descricao})?`)) return;
+  state.receitas.splice(i, 1);
+  if(state.usuario.saldo_disponivel !== null){ state.usuario.saldo_disponivel -= r.valor; }
+  salvarEstado();
+  render();
+}
+
+function adicionarInvestimentoManual(){
+  const local = document.getElementById('investLocal').value.trim();
+  const valor = parseFloat(document.getElementById('investValor').value);
+  if(!local || isNaN(valor)){ alert('Preencha todos os campos.'); return; }
+  state.investimentos.push({ data: hojeStr(), local, valor });
+  document.getElementById('investLocal').value = '';
+  document.getElementById('investValor').value = '';
+  salvarEstado();
+  render();
+}
+function removerInvestimento(i){
+  const v = state.investimentos[i];
+  if(!v) return;
+  if(!confirm(`Remover investimento de ${fmt(v.valor)} (${v.local})?`)) return;
+  state.investimentos.splice(i, 1);
+  salvarEstado();
+  render();
+}
+
+function adicionarMetaManual(){
+  const nome = document.getElementById('metaNome').value.trim();
+  const valor = parseFloat(document.getElementById('metaValor').value);
+  if(!nome || isNaN(valor)){ alert('Preencha todos os campos.'); return; }
+  state.metas.push({ nome, valorMeta: valor, depositos: [] });
+  document.getElementById('metaNome').value = '';
+  document.getElementById('metaValor').value = '';
+  salvarEstado();
+  render();
+}
+function removerMeta(i){
+  const m = state.metas[i];
+  if(!m) return;
+  if(!confirm(`Remover a meta "${m.nome}" e todo o histórico de depósitos dela?`)) return;
+  state.metas.splice(i, 1);
+  salvarEstado();
+  render();
+}
+
+function removerDespesa(i){
+  const despesa = state.despesas[i];
+  if(!despesa) return;
+  const confirmMsg = despesa.exportado
+    ? `Remover ${fmt(despesa.valor)} (${despesa.categoria})? Essa despesa já foi exportada, então a linha na sua planilha vai continuar lá — você precisará apagá-la manualmente também.`
+    : `Remover ${fmt(despesa.valor)} (${despesa.categoria})?`;
+  if(!confirm(confirmMsg)) return;
+  state.despesas.splice(i, 1);
+  if(state.usuario.saldo_disponivel !== null){
+    state.usuario.saldo_disponivel += despesa.valor;
+  }
+  salvarEstado();
+  render();
+}
+
+function adicionarCompartilhamento(){
+  const nome = document.getElementById('shareNome').value.trim();
+  if(!nome){ alert('Informe o nome da pessoa.'); return; }
+  state.compartilhamentos.push({nome});
+  document.getElementById('shareNome').value='';
+  salvarEstado();
+  render();
+}
+function removerCompartilhamento(i){
+  state.compartilhamentos.splice(i,1);
+  salvarEstado();
+  render();
+}
+
+function compartilharResumo(){
+  const texto = tratarRelatorioDiario().replace(/\*/g,'');
+  if(navigator.share){
+    navigator.share({ title: 'Resumo financeiro', text: texto }).catch(()=>{});
+  } else {
+    navigator.clipboard?.writeText(texto);
+    alert('Resumo copiado! Cole no WhatsApp para enviar.');
+  }
+}
+
+function salvarConfig(){
+  const renda = parseFloat(document.getElementById('cfgRenda').value);
+  const saldo = parseFloat(document.getElementById('cfgSaldo').value);
+  if(!isNaN(renda)) state.usuario.renda_mensal = renda;
+  if(!isNaN(saldo)) state.usuario.saldo_disponivel = saldo;
+  salvarEstado();
+  fecharModal();
+  render();
+}
+
+carregarEstado();
+</script>
+</body>
+</html>

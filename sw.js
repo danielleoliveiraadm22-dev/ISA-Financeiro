@@ -3,7 +3,7 @@
 // IMPORTANTE: ao publicar uma versão nova do index.html,
 // troque o número da versão abaixo (v1 -> v2 -> v3...).
 // ---------------------------------------------------------------
-const VERSAO = 'financeiro-v4';
+const VERSAO = 'financeiro-v5';
 
 const ESSENCIAIS = [
   './',
